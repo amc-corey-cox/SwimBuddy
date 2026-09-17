@@ -18,8 +18,13 @@ come next.
 npm install
 npm run dev        # vite dev server
 npm test           # vitest, headless
-npm run check      # everything CI gates on, in one command
+npm run check      # every CI gate except the browser tests
+npm run test:e2e   # Playwright smoke tests (needs a browser installed)
 ```
+
+`npm run check` runs lint, formatting, typecheck, unit tests with coverage, the
+production build and the bundle check. The browser tests are deliberately separate,
+because they need a Chromium install that CI provides and a fresh checkout does not.
 
 Individual gates:
 

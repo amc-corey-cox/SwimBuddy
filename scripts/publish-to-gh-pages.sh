@@ -52,6 +52,42 @@ if [[ -n "$SOURCE_DIR" && ! -d "$SOURCE_DIR" ]]; then
   exit 1
 fi
 
+# This script runs `rm -rf` on a path built from these arguments. They come from
+# workflow values today, but a publish script should not depend on its caller
+# being careful: reject anything that could escape the checkout.
+assert_safe_subdir() {
+  local label="$1" value="$2" allow_root="${3:-no}"
+
+  if [[ -z "$value" ]]; then
+    echo "$label must not be empty" >&2
+    exit 2
+  fi
+
+  if [[ "$value" == "." ]]; then
+    if [[ "$allow_root" == "allow_root" ]]; then
+      return 0
+    fi
+    echo "$label must name a subdirectory, not the branch root" >&2
+    exit 2
+  fi
+
+  if [[ "$value" == /* ]]; then
+    echo "$label must be a relative path, not absolute: '$value'" >&2
+    exit 2
+  fi
+
+  local component
+  while IFS= read -r component; do
+    if [[ "$component" == ".." ]]; then
+      echo "$label must not contain '..': '$value'" >&2
+      exit 2
+    fi
+  done < <(tr '/' '\n' <<< "$value")
+}
+
+[[ -n "$DEST_DIR" ]] && assert_safe_subdir "--dest" "$DEST_DIR" allow_root
+[[ -n "$REMOVE_DIR" ]] && assert_safe_subdir "--remove" "$REMOVE_DIR"
+
 REPO_URL="${GH_PAGES_REPO_URL:-https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git}"
 SOURCE_ABS=""
 [[ -n "$SOURCE_DIR" ]] && SOURCE_ABS="$(cd "$SOURCE_DIR" && pwd)"
