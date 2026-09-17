@@ -6,3 +6,6 @@ coverage/
 .DS_Store
 .vite/
 *.log
+screenshots/
+playwright-report/
+test-results/
