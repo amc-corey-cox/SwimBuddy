@@ -1,0 +1,52 @@
+:root {
+  --bg: #0b1220;
+  --fg: #eef4ff;
+  --muted: #9bb0cc;
+  --accent: #3ea6ff;
+  color-scheme: dark;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  color: var(--fg);
+}
+
+#app {
+  flex: 1;
+  padding: 1.5rem 1rem;
+  max-width: 40rem;
+  width: 100%;
+  margin: 0 auto;
+}
+
+h1 {
+  font-size: 2rem;
+  margin: 0 0 0.25rem;
+}
+
+.tagline {
+  color: var(--muted);
+  margin: 0 0 2rem;
+}
+
+/* AGPL section 13: the source link must be reachable from every screen. */
+.source-footer {
+  padding: 1rem;
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--muted);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.source-footer a {
+  color: var(--accent);
+}
