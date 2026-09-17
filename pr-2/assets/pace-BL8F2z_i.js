@@ -1,0 +1,2 @@
+var e={back:10,breast:15,fly:12};function t(t,n){return n===`free`?t.free:t[n]??t.free+e[n]}var n={"400/200":2,"200/100":1};function r(e,t,r=`400/200`){let i=e-t;if(i<=0)throw RangeError(`Long swim (${String(e)}s) must take longer than the short swim (${String(t)}s)`);return i/n[r]}export{r as n,t};
+//# sourceMappingURL=pace-BL8F2z_i.js.map
