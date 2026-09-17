@@ -41,6 +41,10 @@ All rule-based logic lives in `src/core/` as pure functions and must be covered 
 tests runnable with `npm test` — development happens in a cloud sandbox with no device
 access, so correctness cannot rely on a browser.
 
+TypeScript is pinned to `~6.0.3` on purpose: `typescript-eslint` caps its peer range
+at `<6.1.0`, so a float to 6.1 would break linting. Raise the pin only once the lint
+tooling supports the newer version.
+
 ESLint enforces that boundary rather than trusting it: `src/core/` may not reference
 the DOM, IndexedDB or `localStorage`, and may not import `src/storage/` or `src/ui/`.
 

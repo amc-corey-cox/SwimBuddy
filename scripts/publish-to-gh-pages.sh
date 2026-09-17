@@ -25,7 +25,7 @@ DEST_DIR=""
 REMOVE_DIR=""
 MESSAGE=""
 BRANCH="gh-pages"
-MAX_ATTEMPTS=5
+MAX_ATTEMPTS=8
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
