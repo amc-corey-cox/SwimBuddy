@@ -57,6 +57,22 @@ test('the preview renders the synthetic store', async ({ page }) => {
   await expect(page.getByTestId('swimmer-tile').first()).toContainText(/\d:\d{2} base pace/)
 })
 
+test('opens IndexedDB and seeds the household on first run', async ({ page }) => {
+  // Unit tests use fake-indexeddb; this is the only check that the storage layer
+  // works in a real browser engine.
+  await page.goto('/SwimBuddy/')
+
+  await expect(page.getByTestId('storage-status')).toHaveText(/3 swimmers stored locally/)
+})
+
+test('seeding does not duplicate when the app is reloaded', async ({ page }) => {
+  await page.goto('/SwimBuddy/')
+  await expect(page.getByTestId('storage-status')).toHaveText(/3 swimmers stored locally/)
+
+  await page.reload()
+  await expect(page.getByTestId('storage-status')).toHaveText(/3 swimmers stored locally/)
+})
+
 test('content stays inside the viewport on a phone', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'phone', 'phone viewport only')
 

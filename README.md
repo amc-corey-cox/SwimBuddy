@@ -71,6 +71,18 @@ corpus, as the history the adaptation rules will be tested against, and as the s
 data that makes PR previews show a populated app. See
 [`src/fixtures/README.md`](src/fixtures/README.md).
 
+## Storage
+
+All persistence goes through `src/storage/`, which owns the only `idb` import in
+the codebase. Records carry a UUIDv4, `created_at`/`updated_at` and a `deleted`
+tombstone; deletes are soft so a future sync can propagate them. Schema changes go
+through an ordered migration list, and the selector that decides which migrations
+to run is a pure function so it can be tested without a database.
+
+Unit tests run against `fake-indexeddb`; the app also opens the store and seeds on
+startup so the Playwright suite proves IndexedDB works on a real browser engine.
+See [`src/storage/README.md`](src/storage/README.md).
+
 ## CI
 
 Every pull request runs lint, formatting, typecheck, unit tests with coverage
