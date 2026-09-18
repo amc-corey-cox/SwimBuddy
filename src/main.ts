@@ -14,6 +14,30 @@ tagline.className = 'tagline'
 tagline.textContent = 'Scaffold only — screens land in later steps.'
 app.append(tagline)
 
+// Open the real store and seed the household on first run. Rendered as a status
+// line because it is the only way to confirm IndexedDB actually works in a
+// browser — unit tests run against fake-indexeddb, and the e2e suite's
+// no-console-errors assertion covers the rest. Scaffolding until step 6.
+const storageStatus = document.createElement('p')
+storageStatus.className = 'muted'
+storageStatus.dataset['testid'] = 'storage-status'
+storageStatus.textContent = 'Opening local database…'
+app.append(storageStatus)
+
+void (async () => {
+  try {
+    const { openStore, seedIfEmpty } = await import('./storage/index')
+    const store = await openStore()
+    await seedIfEmpty(store)
+    const swimmers = await store.swimmers.list()
+    storageStatus.textContent = `${String(swimmers.length)} swimmers stored locally`
+  } catch (error) {
+    storageStatus.textContent = `Local database unavailable: ${
+      error instanceof Error ? error.message : String(error)
+    }`
+  }
+})()
+
 // Preview builds seed the page from the synthetic store so a PR preview shows a
 // populated app. The flag is statically replaced at build time, so production
 // builds drop both imports entirely.

@@ -22,7 +22,7 @@ export default defineConfig(({ mode }) => ({
       reporter: ['text-summary', 'html', 'lcov'],
       // The spec requires every rule-based behavior to be unit tested, and
       // src/core/ is where those rules live. UI is covered by e2e instead.
-      include: ['src/core/**/*.ts', 'src/fixtures/**/*.ts'],
+      include: ['src/core/**/*.ts', 'src/fixtures/**/*.ts', 'src/storage/**/*.ts'],
       exclude: ['**/*.test.ts', 'src/core/types.ts'],
       thresholds: {
         statements: 100,
