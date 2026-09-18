@@ -99,7 +99,8 @@ export function demoTemplates(referenceDate: number = FIXTURE_REFERENCE_DATE): T
         '  6x25 stroke of the day @ 1:00',
         '',
         'cooldown:',
-        '  100 easy, float on your back and look at the ceiling',
+        '  100 choice easy',
+        '  1:00 back float    # look at the ceiling',
       ].join('\n'),
     },
   ]

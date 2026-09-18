@@ -62,12 +62,46 @@ export type Interval =
 /** A fixed count, or a `{reps:MIN-MAX}` slot resolved per swimmer. */
 export type RepCount = number | { readonly min: number; readonly max: number }
 
+export type ActivityMode = 'swim' | 'kick' | 'pull' | 'drill'
+
 /**
- * A stroke word the parser recognised. Wider than StrokeGroup: a template may
- * call for an IM or leave the stroke to the swimmer, neither of which has a
- * base pace of its own.
+ * A catalogue entry: what an activity is and how it is paced.
+ *
+ * A **paced** activity takes its send-off from the swimmer's base pace for the
+ * relevant stroke group. An unpaced one — treading water, an underwater dolphin
+ * — has no base-pace send-off, and an interval on it is read literally.
  */
-export type RecognisedStroke = StrokeGroup | 'im' | 'choice'
+export interface Activity {
+  readonly id: string
+  readonly name: string
+  readonly paced: boolean
+  readonly stroke_group?: StrokeGroup
+  readonly mode?: ActivityMode
+  readonly extent_kind: 'distance' | 'time' | 'either'
+  /** The words a template author might write for it. */
+  readonly aliases: readonly string[]
+}
+
+/**
+ * How much of a thing a set part is: a distance in pool units, or a duration.
+ * Never both — "20:00 free" knows its time and not its distance, and treading
+ * water has no distance at all.
+ */
+export type Extent =
+  | { readonly kind: 'distance'; readonly value: number }
+  | { readonly kind: 'time'; readonly seconds: number }
+
+/**
+ * One activity within a set. Most sets have exactly one part; a compound set
+ * like `25 drill / 50 swim` has several inside a single repetition.
+ */
+export interface SetPart {
+  readonly extent: Extent
+  /** Catalogue id, when the descriptor named an activity we recognise. */
+  readonly activity?: string
+  /** The words naming the activity and its modifiers, verbatim. */
+  readonly descriptor: string
+}
 
 /**
  * One line of a template after parsing.
@@ -80,15 +114,7 @@ export type ParsedLine =
   | {
       readonly kind: 'set'
       readonly reps: RepCount
-      readonly distance: number
-      /**
-       * Everything between the distance and the interval, verbatim: stroke,
-       * drill, equipment, whatever the author wrote. Not decomposed further,
-       * because real templates put prose here and splitting it loses content.
-       */
-      readonly descriptor: string
-      /** Set only when a stroke word was recognised; used for base pace lookup. */
-      readonly stroke?: RecognisedStroke
+      readonly parts: readonly SetPart[]
       readonly interval?: Interval
       readonly note?: string
       readonly raw: string

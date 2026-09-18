@@ -1,12 +1,14 @@
 import { roundToNearest25 } from './units'
+import { recogniseActivity } from './activities'
 import type {
+  Extent,
   Intensity,
   Interval,
   LevelRange,
   ParsedLine,
   ParsedSection,
-  RecognisedStroke,
   RepCount,
+  SetPart,
 } from './types'
 
 /**
@@ -31,27 +33,17 @@ const META_KEYS = new Set(['name', 'tags', 'intensity', 'level'])
 
 const INTENSITIES = new Set<Intensity>(['easy', 'moderate', 'hard'])
 
-/**
- * Stroke words worth recognising, longest spellings first so that "backstroke"
- * is not matched as "back" with "stroke" left over.
- */
-const STROKE_WORDS: readonly (readonly [RegExp, RecognisedStroke])[] = [
-  [/\bfreestyle\b|\bfree\b/i, 'free'],
-  [/\bbackstroke\b|\bback\b/i, 'back'],
-  [/\bbreaststroke\b|\bbreast\b/i, 'breast'],
-  [/\bbutterfly\b|\bfly\b/i, 'fly'],
-  [/\bim\b|\bindividual medley\b/i, 'im'],
-  [/\bchoice\b/i, 'choice'],
-]
-
 /** `warmup:` — a bare word and a colon, with nothing following it. */
 const SECTION_HEADER = /^([A-Za-z][\w -]*):\s*$/
 
 /** `name: Aerobic base` — a key, a colon, and a value. */
 const META_LINE = /^([A-Za-z][\w-]*):\s+(.*\S)\s*$/
 
-/** `4x50`, `{reps:4-8}x100`, or a bare `300`. */
-const SET_HEAD = /^(?:(\{reps:(\d+)-(\d+)\}|\d+)\s*[x×]\s*)?(\d+)\b/
+/**
+ * `4x50`, `{reps:4-8}x100`, `2x1:00`, or a bare `300`. The extent is either a
+ * distance or a clock duration; an interval, when present, comes after `@`.
+ */
+const SET_HEAD = /^(?:(\{reps:(\d+)-(\d+)\}|\d+)\s*[x×]\s*)?(\d+:[0-5]\d|\d+)\b/
 
 const REPS_SLOT = /^\{reps:(\d+)-(\d+)\}$/
 
@@ -117,22 +109,43 @@ function parseSet(raw: string, trimmed: string, note: string | undefined): Parse
   const reps = parseReps(head[1])
   if (reps === null) return null
 
-  const distance = roundToNearest25(Number(head[4]))
-  if (distance <= 0) return null
+  const extent = parseExtent(head[4])
+  if (extent === null) return null
 
   const descriptor = text.slice(head[0].length).trim()
-  const stroke = recogniseStroke(descriptor)
+  const activity = recogniseActivity(descriptor)
+
+  const part: SetPart = {
+    extent,
+    descriptor,
+    ...(activity ? { activity: activity.id } : {}),
+  }
 
   return {
     kind: 'set',
     reps,
-    distance,
-    descriptor,
+    parts: [part],
     raw,
-    ...(stroke ? { stroke } : {}),
     ...(interval ? { interval } : {}),
     ...(note !== undefined ? { note } : {}),
   }
+}
+
+/**
+ * A set's extent is a distance or a duration. Distances round to the nearest 25
+ * because pools come in lengths; durations are taken as written.
+ */
+export function parseExtent(text: string): Extent | null {
+  const clock = /^(\d+):([0-5]\d)$/.exec(text)
+  if (clock?.[1] && clock[2]) {
+    const seconds = Number(clock[1]) * 60 + Number(clock[2])
+    return seconds > 0 ? { kind: 'time', seconds } : null
+  }
+
+  if (!/^\d+$/.test(text)) return null
+
+  const value = roundToNearest25(Number(text))
+  return value > 0 ? { kind: 'distance', value } : null
 }
 
 /** Text after `#` is a coaching note: displayed, never parsed. */
@@ -191,19 +204,6 @@ function parseReps(text: string | undefined): RepCount | null {
 
   const reps = Number(text)
   return reps > 0 ? reps : null
-}
-
-/**
- * Looks for a stroke only at the front of the descriptor, because the grammar is
- * `NxD stroke type` and prose further along is not a stroke declaration. Without
- * this, a cooldown reading "100 easy, float on your back" is filed as backstroke.
- */
-function recogniseStroke(descriptor: string): RecognisedStroke | undefined {
-  const lead = descriptor.split(/\s+/).slice(0, 2).join(' ')
-  for (const [pattern, stroke] of STROKE_WORDS) {
-    if (pattern.test(lead)) return stroke
-  }
-  return undefined
 }
 
 /** Reads the header fields out of the leading block, which is the only place they live. */
