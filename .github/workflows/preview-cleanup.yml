@@ -1,0 +1,58 @@
+name: Remove PR preview
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: preview-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  cleanup:
+    name: Remove preview from gh-pages
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Remove the preview directory
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ./scripts/publish-to-gh-pages.sh \
+            --remove "pr-${{ github.event.pull_request.number }}" \
+            --message "Remove preview for PR #${{ github.event.pull_request.number }}"
+
+      - name: Update the preview comment
+        uses: actions/github-script@v7
+        env:
+          PREVIEW_NUMBER: ${{ github.event.pull_request.number }}
+        with:
+          script: |
+            const number = Number(process.env.PREVIEW_NUMBER)
+            const marker = '<!-- swimbuddy-preview -->'
+
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              ...context.repo,
+              issue_number: number,
+            })
+            const existing = comments.find(
+              (comment) => comment.user.type === 'Bot' && comment.body.includes(marker),
+            )
+            if (!existing) return
+
+            await github.rest.issues.updateComment({
+              ...context.repo,
+              comment_id: existing.id,
+              body: [
+                marker,
+                '### 🏊 Live preview',
+                '',
+                'Removed — this pull request is closed.',
+              ].join('\n'),
+            })

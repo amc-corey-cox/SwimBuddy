@@ -1,0 +1,10 @@
+dist/
+coverage/
+playwright-report/
+test-results/
+node_modules/
+package-lock.json
+LICENSE
+
+# The project spec is the author's document; formatting it is not ours to do.
+CLAUDE.md

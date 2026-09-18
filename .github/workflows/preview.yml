@@ -1,0 +1,117 @@
+name: PR preview
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: preview-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  preview:
+    name: Build and publish preview
+    runs-on: ubuntu-latest
+    # A pull request from a fork gets a read-only token, so it cannot publish.
+    # Guarded explicitly rather than failing halfway through.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      # Runs against the default base path and writes screenshots/.
+      # Allowed to fail: a broken preview is still worth looking at, and CI
+      # gates the merge separately.
+      - name: Capture screenshots
+        id: screenshots
+        continue-on-error: true
+        run: npm run test:e2e
+
+      - name: Build preview
+        env:
+          BASE_PATH: /SwimBuddy/pr-${{ github.event.pull_request.number }}/
+          VITE_SHOW_FIXTURES: 'true'
+        run: npm run build
+
+      - name: Bundle screenshots with the preview
+        run: |
+          mkdir -p dist/screenshots
+          cp screenshots/*.png dist/screenshots/ 2>/dev/null || echo "No screenshots captured."
+
+      - name: Publish preview to gh-pages
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ./scripts/publish-to-gh-pages.sh \
+            --source dist \
+            --dest "pr-${{ github.event.pull_request.number }}" \
+            --message "Preview for PR #${{ github.event.pull_request.number }} (${GITHUB_SHA::7})"
+
+      - name: Comment the preview link
+        uses: actions/github-script@v7
+        env:
+          PREVIEW_NUMBER: ${{ github.event.pull_request.number }}
+          SCREENSHOTS_OUTCOME: ${{ steps.screenshots.outcome }}
+        with:
+          script: |
+            const number = Number(process.env.PREVIEW_NUMBER)
+            const sha = context.sha.slice(0, 7)
+            const base = `https://amc-corey-cox.github.io/SwimBuddy/pr-${number}`
+            const marker = '<!-- swimbuddy-preview -->'
+
+            const shotsOk = process.env.SCREENSHOTS_OUTCOME === 'success'
+            const shots = shotsOk
+              ? [
+                  '',
+                  '| Phone | Desktop |',
+                  '| --- | --- |',
+                  `| <img src="${base}/screenshots/phone-home.png?v=${sha}" width="240"> | <img src="${base}/screenshots/desktop-home.png?v=${sha}" width="420"> |`,
+                ].join('\n')
+              : '\n> Browser tests did not pass on this commit, so screenshots may be missing or stale.'
+
+            const body = [
+              marker,
+              '### 🏊 Live preview',
+              '',
+              `**[Open the preview →](${base}/)**`,
+              '',
+              `Built from \`${sha}\` and seeded with synthetic data — invented swimmers, not real ones.`,
+              shots,
+              '',
+              '<sub>Updates on every push. Removed when this PR closes.</sub>',
+            ].join('\n')
+
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              ...context.repo,
+              issue_number: number,
+            })
+            const existing = comments.find(
+              (comment) => comment.user.type === 'Bot' && comment.body.includes(marker),
+            )
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                ...context.repo,
+                comment_id: existing.id,
+                body,
+              })
+            } else {
+              await github.rest.issues.createComment({
+                ...context.repo,
+                issue_number: number,
+                body,
+              })
+            }

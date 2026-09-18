@@ -4,7 +4,12 @@
   --muted: #9bb0cc;
   --accent: #3ea6ff;
   color-scheme: dark;
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
 }
 
 * {
@@ -49,4 +54,61 @@ h1 {
 
 .source-footer a {
   color: var(--accent);
+}
+
+.demo {
+  margin-top: 2rem;
+}
+
+.demo-banner {
+  padding: 0.6rem 0.8rem;
+  border: 1px solid rgba(62, 166, 255, 0.4);
+  border-radius: 0.5rem;
+  background: rgba(62, 166, 255, 0.08);
+  color: var(--muted);
+  font-size: 0.85rem;
+  margin: 0 0 1.25rem;
+}
+
+.swimmer-tiles {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.swimmer-tile {
+  padding: 1rem;
+  border-radius: 0.75rem;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.swimmer-tile h2 {
+  margin: 0;
+  font-size: 1.35rem;
+}
+
+.stat {
+  margin: 0.25rem 0 0;
+  font-size: 1.6rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.muted {
+  margin: 0.25rem 0 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.recent h2 {
+  font-size: 1.1rem;
+  margin: 2rem 0 0.5rem;
+}
+
+.session-list {
+  margin: 0;
+  padding-left: 1.2rem;
+  color: var(--muted);
+  line-height: 1.7;
 }
