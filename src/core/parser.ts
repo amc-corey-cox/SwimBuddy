@@ -1,12 +1,20 @@
 import { roundToNearest25 } from './units'
+import { recogniseActivity } from './activities'
+import {
+  recogniseEffort,
+  recogniseEquipment,
+  recognisePattern,
+  recogniseStructure,
+} from './modifiers'
 import type {
+  Extent,
   Intensity,
   Interval,
   LevelRange,
   ParsedLine,
   ParsedSection,
-  RecognisedStroke,
   RepCount,
+  SetPart,
 } from './types'
 
 /**
@@ -31,27 +39,17 @@ const META_KEYS = new Set(['name', 'tags', 'intensity', 'level'])
 
 const INTENSITIES = new Set<Intensity>(['easy', 'moderate', 'hard'])
 
-/**
- * Stroke words worth recognising, longest spellings first so that "backstroke"
- * is not matched as "back" with "stroke" left over.
- */
-const STROKE_WORDS: readonly (readonly [RegExp, RecognisedStroke])[] = [
-  [/\bfreestyle\b|\bfree\b/i, 'free'],
-  [/\bbackstroke\b|\bback\b/i, 'back'],
-  [/\bbreaststroke\b|\bbreast\b/i, 'breast'],
-  [/\bbutterfly\b|\bfly\b/i, 'fly'],
-  [/\bim\b|\bindividual medley\b/i, 'im'],
-  [/\bchoice\b/i, 'choice'],
-]
-
 /** `warmup:` — a bare word and a colon, with nothing following it. */
 const SECTION_HEADER = /^([A-Za-z][\w -]*):\s*$/
 
 /** `name: Aerobic base` — a key, a colon, and a value. */
 const META_LINE = /^([A-Za-z][\w-]*):\s+(.*\S)\s*$/
 
-/** `4x50`, `{reps:4-8}x100`, or a bare `300`. */
-const SET_HEAD = /^(?:(\{reps:(\d+)-(\d+)\}|\d+)\s*[x×]\s*)?(\d+)\b/
+/**
+ * `4x50`, `{reps:4-8}x100`, `2x1:00`, or a bare `300`. The extent is either a
+ * distance or a clock duration; an interval, when present, comes after `@`.
+ */
+const SET_HEAD = /^(?:(\{reps:(\d+)-(\d+)\}|\d+)\s*[x×]\s*)?(\d+:[0-5]\d|\d+)(?=\s|$)/
 
 const REPS_SLOT = /^\{reps:(\d+)-(\d+)\}$/
 
@@ -109,7 +107,8 @@ export function parseLine(raw: string): ParsedLine {
 }
 
 function parseSet(raw: string, trimmed: string, note: string | undefined): ParsedLine | null {
-  const { text, interval } = splitInterval(trimmed)
+  const withoutPace = splitPace(trimmed)
+  const { text, interval } = splitInterval(withoutPace.text)
 
   const head = SET_HEAD.exec(text)
   if (!head?.[4]) return null
@@ -117,22 +116,89 @@ function parseSet(raw: string, trimmed: string, note: string | undefined): Parse
   const reps = parseReps(head[1])
   if (reps === null) return null
 
-  const distance = roundToNearest25(Number(head[4]))
-  if (distance <= 0) return null
+  const extent = parseExtent(head[4])
+  if (extent === null) return null
 
   const descriptor = text.slice(head[0].length).trim()
-  const stroke = recogniseStroke(descriptor)
+
+  // An activity is only attached when the catalogue says it can be measured the
+  // way this set measures it. Treading water is timed, so "100 tread water" is
+  // not a tread-water set; the words stay in the descriptor rather than
+  // producing a part the model says cannot exist.
+  const recognised = recogniseActivity(descriptor)
+  const activity =
+    recognised && (recognised.extent_kind === 'either' || recognised.extent_kind === extent.kind)
+      ? recognised
+      : undefined
+
+  // Equipment and effort describe the swimming, so they sit on the part. A
+  // pattern and a structure describe the repetitions, so they sit on the set.
+  // None of them consume the descriptor: recognising a word is additive, and
+  // the words stay verbatim for anything the catalogues do not know.
+  const equipment = recogniseEquipment(descriptor)
+  const effort = recogniseEffort(descriptor)
+
+  const part: SetPart = {
+    extent,
+    descriptor,
+    ...(activity ? { activity: activity.id } : {}),
+    ...(equipment.length > 0 ? { equipment } : {}),
+    ...(effort ? { effort: effort.id } : {}),
+  }
+
+  const pattern = recognisePattern(descriptor)
+  const structure = recogniseStructure(descriptor)
 
   return {
     kind: 'set',
     reps,
-    distance,
-    descriptor,
+    parts: [part],
     raw,
-    ...(stroke ? { stroke } : {}),
     ...(interval ? { interval } : {}),
+    ...(withoutPace.pace ? { pace: withoutPace.pace } : {}),
+    ...(pattern ? { pattern } : {}),
+    ...(structure ? { structure: structure.id } : {}),
     ...(note !== undefined ? { note } : {}),
   }
+}
+
+/**
+ * Splits a `hold <pace>` target off a set.
+ *
+ * Only strips it when what follows reads as a pace, so "hold the wall" stays in
+ * the descriptor rather than being eaten by a keyword.
+ */
+function splitPace(trimmed: string): { text: string; pace?: Interval } {
+  // The candidate spans an optional spaced offset, because `hold base + 15` is
+  // valid wherever `@ base + 15` is and capturing only `base` would drop the
+  // offset into the descriptor and silently prescribe the wrong pace.
+  // Deliberately loose: parseInterval stays the single judge of what a pace is,
+  // rather than this regex growing a second copy of that grammar.
+  const match = /\bhold\s+(\S+(?:\s*[+-]\s*\d+)?)/i.exec(trimmed)
+  if (!match?.[1]) return { text: trimmed }
+
+  const pace = parseInterval(match[1])
+  if (!pace) return { text: trimmed }
+
+  const text = (trimmed.slice(0, match.index) + trimmed.slice(match.index + match[0].length)).trim()
+  return { text, pace }
+}
+
+/**
+ * A set's extent is a distance or a duration. Distances round to the nearest 25
+ * because pools come in lengths; durations are taken as written.
+ */
+export function parseExtent(text: string): Extent | null {
+  const clock = /^(\d+):([0-5]\d)$/.exec(text)
+  if (clock?.[1] && clock[2]) {
+    const seconds = Number(clock[1]) * 60 + Number(clock[2])
+    return seconds > 0 ? { kind: 'time', seconds } : null
+  }
+
+  if (!/^\d+$/.test(text)) return null
+
+  const value = roundToNearest25(Number(text))
+  return value > 0 ? { kind: 'distance', value } : null
 }
 
 /** Text after `#` is a coaching note: displayed, never parsed. */
@@ -191,19 +257,6 @@ function parseReps(text: string | undefined): RepCount | null {
 
   const reps = Number(text)
   return reps > 0 ? reps : null
-}
-
-/**
- * Looks for a stroke only at the front of the descriptor, because the grammar is
- * `NxD stroke type` and prose further along is not a stroke declaration. Without
- * this, a cooldown reading "100 easy, float on your back" is filed as backstroke.
- */
-function recogniseStroke(descriptor: string): RecognisedStroke | undefined {
-  const lead = descriptor.split(/\s+/).slice(0, 2).join(' ')
-  for (const [pattern, stroke] of STROKE_WORDS) {
-    if (pattern.test(lead)) return stroke
-  }
-  return undefined
 }
 
 /** Reads the header fields out of the leading block, which is the only place they live. */

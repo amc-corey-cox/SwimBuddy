@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { parseInterval, parseLine, parseTemplate, type ParsedTemplate } from './parser'
+import { parseExtent, parseInterval, parseLine, parseTemplate, type ParsedTemplate } from './parser'
 import { demoTemplates } from '../fixtures/templates'
-import type { ParsedLine } from './types'
+import type { ParsedLine, SetPart } from './types'
 
 /** Every raw line the parser retained, in order. */
 function retainedLines(parsed: ParsedTemplate): string[] {
@@ -14,6 +14,18 @@ function retainedLines(parsed: ParsedTemplate): string[] {
 function set(line: ParsedLine) {
   if (line.kind !== 'set') throw new Error(`expected a set, got ${line.kind}: ${line.raw}`)
   return line
+}
+
+function part(line: ParsedLine): SetPart {
+  const first = set(line).parts[0]
+  if (!first) throw new Error(`set has no parts: ${line.raw}`)
+  return first
+}
+
+function distanceOf(line: ParsedLine): number {
+  const extent = part(line).extent
+  if (extent.kind !== 'distance') throw new Error(`expected a distance: ${line.raw}`)
+  return extent.value
 }
 
 describe('set lines', () => {
@@ -30,8 +42,8 @@ describe('set lines', () => {
     const line = set(parseLine(raw))
 
     expect(line.reps).toBe(reps)
-    expect(line.distance).toBe(distance)
-    expect(line.descriptor).toBe(descriptor)
+    expect(distanceOf(line)).toBe(distance)
+    expect(part(line).descriptor).toBe(descriptor)
     expect(line.raw).toBe(raw)
   })
 
@@ -44,9 +56,9 @@ describe('set lines', () => {
   })
 
   it('rounds distances to the nearest 25', () => {
-    expect(set(parseLine('4x30 free')).distance).toBe(25)
-    expect(set(parseLine('4x40 free')).distance).toBe(50)
-    expect(set(parseLine('333 free')).distance).toBe(325)
+    expect(distanceOf(parseLine('4x30 free'))).toBe(25)
+    expect(distanceOf(parseLine('4x40 free'))).toBe(50)
+    expect(distanceOf(parseLine('333 free'))).toBe(325)
   })
 })
 
@@ -96,14 +108,63 @@ describe('intervals', () => {
     const line = set(parseLine('8x100 free @ base+15'))
 
     expect(line.interval).toEqual({ kind: 'base', offset_seconds: 15 })
-    expect(line.descriptor).toBe('free')
+    expect(part(line).descriptor).toBe('free')
   })
 
   it('keeps an unrecognisable interval in the descriptor rather than dropping it', () => {
     const line = set(parseLine('8x100 free @ whenever'))
 
     expect(line.interval).toBeUndefined()
-    expect(line.descriptor).toBe('free @ whenever')
+    expect(part(line).descriptor).toBe('free @ whenever')
+  })
+})
+
+describe('pace', () => {
+  it('reads a held pace alongside the send-off', () => {
+    const line = set(parseLine('8x100 free @ base+15 hold 1:20'))
+
+    // Two different instructions: leave every base+15, swim each in 1:20.
+    expect(line.interval).toEqual({ kind: 'base', offset_seconds: 15 })
+    expect(line.pace).toEqual({ kind: 'literal', seconds: 80 })
+    expect(part(line).descriptor).toBe('free')
+  })
+
+  it('reads a pace with no send-off at all', () => {
+    const line = set(parseLine('400 free hold base'))
+
+    expect(line.interval).toBeUndefined()
+    expect(line.pace).toEqual({ kind: 'base', offset_seconds: 0 })
+  })
+
+  it('accepts a pace relative to base', () => {
+    expect(set(parseLine('4x50 free hold base-5')).pace).toEqual({
+      kind: 'base',
+      offset_seconds: -5,
+    })
+  })
+
+  it('leaves pace unset when none is given', () => {
+    expect(set(parseLine('8x100 free @ base+15')).pace).toBeUndefined()
+  })
+
+  it.each([
+    ['8x100 free hold base + 15', { kind: 'base', offset_seconds: 15 }],
+    ['8x100 free hold base - 5', { kind: 'base', offset_seconds: -5 }],
+    ['8x100 free hold base +15', { kind: 'base', offset_seconds: 15 }],
+  ])('reads the spaced form in %s', (raw, expected) => {
+    // `@ base + 15` already worked, so `hold base + 15` failing would have been a
+    // silent halving of the offset rather than a visible error.
+    const line = set(parseLine(raw))
+
+    expect(line.pace).toEqual(expected)
+    expect(part(line).descriptor).toBe('free')
+  })
+
+  it('does not eat the word hold when what follows is not a pace', () => {
+    const line = set(parseLine('4x25 free hold the wall and breathe'))
+
+    expect(line.pace).toBeUndefined()
+    expect(part(line).descriptor).toBe('free hold the wall and breathe')
   })
 })
 
@@ -112,8 +173,11 @@ describe('coaching notes', () => {
     const line = set(parseLine('4x50 free @ base+25    # build 1-4'))
 
     expect(line.note).toBe('build 1-4')
-    expect(line.descriptor).toBe('free')
+    expect(part(line).descriptor).toBe('free')
     expect(line.interval).toEqual({ kind: 'base', offset_seconds: 25 })
+    // A note is displayed, never parsed — including when it is full of words
+    // the pattern catalogue would otherwise recognise.
+    expect(line.pattern).toBeUndefined()
   })
 
   it('does not parse the note, however set-like it looks', () => {
@@ -136,30 +200,202 @@ describe('coaching notes', () => {
   })
 })
 
-describe('stroke recognition', () => {
+describe('activity recognition', () => {
   it.each([
     ['300 free easy', 'free'],
     ['4x50 freestyle', 'free'],
     ['4x50 back @ base+10', 'back'],
-    ['4x50 backstroke', 'back'],
-    ['4x50 breast', 'breast'],
+    ['4x50 breaststroke', 'breast'],
     ['4x50 fly', 'fly'],
     ['4x100 IM @ base+30', 'im'],
     ['200 choice easy', 'choice'],
-  ])('recognises the stroke in %s', (raw, stroke) => {
-    expect(set(parseLine(raw)).stroke).toBe(stroke)
+    ['4x50 kick with board @ base+40', 'kick'],
+    ['4x50 pull with buoy', 'pull'],
+    ['50 corkscrew', 'corkscrew'],
+    ['4x25 underwater dolphin', 'underwater_dolphin'],
+    ['2x1:00 tread water', 'tread_water'],
+    ['1:00 back float', 'back_float'],
+  ])('recognises the activity in %s', (raw, activity) => {
+    expect(part(parseLine(raw)).activity).toBe(activity)
   })
 
-  it('leaves the stroke unset when none is named', () => {
-    expect(set(parseLine('4x50 kick with board')).stroke).toBeUndefined()
+  it('leaves the activity unset when nothing in the catalogue matches', () => {
+    expect(part(parseLine('4x50 something nobody has named yet')).activity).toBeUndefined()
   })
 
-  it('does not mistake prose later in the line for a stroke', () => {
-    // The grammar is `NxD stroke type`; "float on your back" is not a stroke
-    // declaration, and reading it as one would send the resolver to the wrong
-    // base pace.
-    const line = set(parseLine('100 easy, float on your back and look at the ceiling'))
-    expect(line.stroke).toBeUndefined()
+  it('prefers the longest matching alias', () => {
+    // "back float" must not be read as "back", and "underwater dolphin" must not
+    // lose to a shorter alias.
+    expect(part(parseLine('1:00 back float')).activity).toBe('back_float')
+    expect(part(parseLine('4x25 underwater dolphin')).activity).toBe('underwater_dolphin')
+  })
+
+  it('finds an activity named after its modifiers, not only before them', () => {
+    expect(part(parseLine('4x50 easy free')).activity).toBe('free')
+  })
+})
+
+describe('extents', () => {
+  it('reads a bare number as a distance', () => {
+    expect(part(parseLine('100 free')).extent).toEqual({ kind: 'distance', value: 100 })
+  })
+
+  it('reads a clock value at the head as a duration', () => {
+    expect(part(parseLine('1:00 tread water')).extent).toEqual({ kind: 'time', seconds: 60 })
+    expect(part(parseLine('2x0:30 tread water')).extent).toEqual({ kind: 'time', seconds: 30 })
+  })
+
+  it('does not round durations to 25 the way it rounds distances', () => {
+    expect(part(parseLine('0:40 sculling')).extent).toEqual({ kind: 'time', seconds: 40 })
+  })
+
+  it('keeps the head extent and the interval apart', () => {
+    const line = set(parseLine('2x1:00 tread water @ 1:30'))
+
+    expect(part(line).extent).toEqual({ kind: 'time', seconds: 60 })
+    expect(line.interval).toEqual({ kind: 'literal', seconds: 90 })
+  })
+
+  it('rejects a zero duration', () => {
+    expect(parseLine('0:00 tread water').kind).toBe('unparsed')
+  })
+
+  it.each(['abc', '', '1:75', 'base+10'])('rejects %s as an extent', (text) => {
+    expect(parseExtent(text)).toBeNull()
+  })
+
+  it('does not take the front of a malformed clock value', () => {
+    // 1:00:30 is not an extent. Accepting "1:00" and leaving ":30" in the
+    // descriptor would silently halve a set nobody checked.
+    expect(parseLine('1:00:30 free').kind).toBe('unparsed')
+  })
+
+  it('requires whitespace or end of line after the extent', () => {
+    expect(parseLine('100m free').kind).toBe('unparsed')
+  })
+})
+
+describe('an activity has to agree with the extent it is given', () => {
+  it('does not attach a time-only activity to a distance', () => {
+    // tread_water is measured in time. Attaching it to "100" would produce a
+    // part the model says cannot exist.
+    const line = parseLine('100 tread water')
+
+    if (line.kind !== 'set') throw new Error('expected a set')
+    expect(line.parts[0]?.activity).toBeUndefined()
+    expect(line.parts[0]?.descriptor).toBe('tread water')
+  })
+
+  it('does not attach a distance-only activity to a duration', () => {
+    const line = parseLine('1:00 fly')
+
+    if (line.kind !== 'set') throw new Error('expected a set')
+    expect(line.parts[0]?.activity).toBeUndefined()
+  })
+
+  it('accepts an either-extent activity both ways', () => {
+    const distance = parseLine('100 sculling')
+    const time = parseLine('1:00 sculling')
+
+    if (distance.kind !== 'set' || time.kind !== 'set') throw new Error('expected sets')
+    expect(distance.parts[0]?.activity).toBe('sculling')
+    expect(time.parts[0]?.activity).toBe('sculling')
+  })
+})
+
+describe('equipment and effort on the part', () => {
+  it('reads the kit the set asks the swimmer to carry', () => {
+    expect(part(parseLine('4x50 kick with board @ base+40')).equipment).toEqual(['board'])
+  })
+
+  it('reads more than one piece of kit', () => {
+    expect(part(parseLine('8x50 free with fins and paddles')).equipment).toEqual([
+      'fins',
+      'paddles',
+    ])
+  })
+
+  it('reads the effort band', () => {
+    expect(part(parseLine('300 free easy')).effort).toBe('easy')
+  })
+
+  it('leaves both off a set that prescribes neither', () => {
+    const bare = part(parseLine('8x100 free @ base+15'))
+
+    expect(bare.equipment).toBeUndefined()
+    expect(bare.effort).toBeUndefined()
+  })
+
+  it('keeps the descriptor verbatim, because recognising a word never eats it', () => {
+    // The catalogues are examples, not an exhaustive library. Anything they do
+    // not know still has to reach the swimmer exactly as the author wrote it.
+    const line = part(parseLine('4x50 kick with board, toes pointed'))
+
+    expect(line.descriptor).toBe('kick with board, toes pointed')
+    expect(line.equipment).toEqual(['board'])
+  })
+
+  it('does not confuse an effort band with a pace', () => {
+    const line = set(parseLine('8x100 free hard hold 1:20'))
+
+    expect(part(line).effort).toBe('hard')
+    expect(line.pace).toEqual({ kind: 'literal', seconds: 80 })
+  })
+})
+
+describe('pattern and structure on the set', () => {
+  it('reads a bare build as a shape inside each repetition', () => {
+    expect(set(parseLine('4x50 free build @ base+25')).pattern).toEqual({
+      id: 'build',
+      scope: 'within_rep',
+    })
+  })
+
+  it('reads a build over a range of repetitions as a shape across the set', () => {
+    // Same word, different instruction: "4x50 build" says how to swim each 50,
+    // "4x50 build 1-4" says how the fourth compares to the first.
+    expect(set(parseLine('4x50 free build 1-4 @ base+25')).pattern).toEqual({
+      id: 'build',
+      scope: 'across_set',
+      range: { from: 1, to: 4 },
+    })
+  })
+
+  it('reads descend as across the set', () => {
+    expect(set(parseLine('8x100 free descend 1-4 @ base+15')).pattern).toEqual({
+      id: 'descend',
+      scope: 'across_set',
+      range: { from: 1, to: 4 },
+    })
+  })
+
+  it('reads a structure', () => {
+    expect(set(parseLine('4x25 free relay')).structure).toBe('relay')
+  })
+
+  it('leaves both off a set that has neither', () => {
+    const line = set(parseLine('8x100 free @ base+15'))
+
+    expect(line.pattern).toBeUndefined()
+    expect(line.structure).toBeUndefined()
+  })
+
+  it('keeps a pattern and a pace apart, since a held pace is not a descending series', () => {
+    const line = set(parseLine('8x100 free descend 1-4 hold 1:20'))
+
+    expect(line.pattern?.id).toBe('descend')
+    expect(line.pace).toEqual({ kind: 'literal', seconds: 80 })
+  })
+
+  it('reads all four slots off one line without losing the descriptor', () => {
+    const line = set(parseLine('4x50 free build 1-4 with fins, relay hard @ base+20'))
+
+    expect(part(line).equipment).toEqual(['fins'])
+    expect(part(line).effort).toBe('hard')
+    expect(line.pattern).toEqual({ id: 'build', scope: 'across_set', range: { from: 1, to: 4 } })
+    expect(line.structure).toBe('relay')
+    expect(part(line).descriptor).toBe('free build 1-4 with fins, relay hard')
+    expect(line.interval).toEqual({ kind: 'base', offset_seconds: 20 })
   })
 })
 
@@ -307,16 +543,29 @@ describe('the template library round-trips without losing content', () => {
     }
   })
 
-  it('never emits a set with a non-positive or non-25 distance', () => {
+  it('never emits a distance that is not a positive multiple of 25', () => {
     for (const template of templates) {
       const sets = parseTemplate(template.raw_text)
         .sections.flatMap((section) => section.lines)
         .filter((line) => line.kind === 'set')
 
       for (const line of sets) {
-        expect(line.distance).toBeGreaterThan(0)
-        expect(line.distance % 25).toBe(0)
+        for (const setPart of line.parts) {
+          if (setPart.extent.kind !== 'distance') continue
+          expect(setPart.extent.value).toBeGreaterThan(0)
+          expect(setPart.extent.value % 25).toBe(0)
+        }
       }
+    }
+  })
+
+  it('gives every set at least one part', () => {
+    for (const template of templates) {
+      const sets = parseTemplate(template.raw_text)
+        .sections.flatMap((section) => section.lines)
+        .filter((line) => line.kind === 'set')
+
+      for (const line of sets) expect(line.parts.length).toBeGreaterThan(0)
     }
   })
 })

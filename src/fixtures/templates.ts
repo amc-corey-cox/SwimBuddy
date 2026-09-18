@@ -36,7 +36,7 @@ export function demoTemplates(referenceDate: number = FIXTURE_REFERENCE_DATE): T
         '',
         'warmup:',
         '  300 swim free easy',
-        '  4x50 free @ base+25    # build 1-4',
+        '  4x50 free build 1-4 @ base+25',
         '',
         'drill:',
         '  4x75 free drill/swim @ base+30',
@@ -99,7 +99,8 @@ export function demoTemplates(referenceDate: number = FIXTURE_REFERENCE_DATE): T
         '  6x25 stroke of the day @ 1:00',
         '',
         'cooldown:',
-        '  100 easy, float on your back and look at the ceiling',
+        '  100 choice easy',
+        '  1:00 back float    # look at the ceiling',
       ].join('\n'),
     },
   ]
