@@ -89,8 +89,14 @@ cooldown:
 
 ### Sets
 
-A set is a repetition count over one or more **parts**, with an optional interval and an
-optional coaching note. Each part carries:
+A set is a repetition count over one or more **parts**, carrying an optional **interval**,
+an optional **pace**, and an optional coaching note.
+
+Interval and pace are different instructions and a swimmer can be given both: `@ base+15`
+says when to leave, `hold 1:20` says how fast to swim it. Both are optional — plenty of
+sets prescribe neither — and both are written the same way, as `base±N` or a clock time.
+
+Each part carries:
 
 - **extent** — a distance in pool units _or_ a duration in seconds. Never both.
 - **activity** — an entry from the catalogue below.
@@ -135,6 +141,8 @@ Parser requirements:
   duration. Intervals: `base+N`, `base-N`, `base`, or a literal like `1:30`.
 - `{reps:MIN-MAX}` resolves per swimmer from their load factor.
 - Distances round to the nearest 25. Durations do not.
+- `hold <pace>` sets a pace target, written like an interval. It is only read as one when
+  what follows is a pace, so "hold the wall" stays in the descriptor.
 - Text after `#` is a coaching note, displayed but not parsed.
 - Free text is for nuance, never for substance. "Alternate direction every 5 strokes" is
   a note on a corkscrew set; the corkscrew itself is an activity.
@@ -189,7 +197,13 @@ new activity is data a swimmer can add rather than a release.
 400/200 and youth a 200/100, and the two compute base pace differently.
 
 `Session.total_distance` includes the easy-swim equivalent of any time-measured sets, so
-one number remains comparable week to week.
+one number remains comparable week to week. That estimate is the answer, not a placeholder:
+recording the distance actually covered in a timed swim would mean counting laps for twenty
+minutes, and automatic lap counting is a stated non-goal.
+
+Swims are not measured. A session records how it felt — too easy, about right, too hard,
+and whether the main set was finished — and the adaptation rules run off that. Recording a
+time for a distance belongs to the base pace test and nowhere else.
 
 Design every record with a future backend in mind, even though v1 is local-only:
 

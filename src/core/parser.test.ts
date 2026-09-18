@@ -119,6 +119,42 @@ describe('intervals', () => {
   })
 })
 
+describe('pace', () => {
+  it('reads a held pace alongside the send-off', () => {
+    const line = set(parseLine('8x100 free @ base+15 hold 1:20'))
+
+    // Two different instructions: leave every base+15, swim each in 1:20.
+    expect(line.interval).toEqual({ kind: 'base', offset_seconds: 15 })
+    expect(line.pace).toEqual({ kind: 'literal', seconds: 80 })
+    expect(part(line).descriptor).toBe('free')
+  })
+
+  it('reads a pace with no send-off at all', () => {
+    const line = set(parseLine('400 free hold base'))
+
+    expect(line.interval).toBeUndefined()
+    expect(line.pace).toEqual({ kind: 'base', offset_seconds: 0 })
+  })
+
+  it('accepts a pace relative to base', () => {
+    expect(set(parseLine('4x50 free hold base-5')).pace).toEqual({
+      kind: 'base',
+      offset_seconds: -5,
+    })
+  })
+
+  it('leaves pace unset when none is given', () => {
+    expect(set(parseLine('8x100 free @ base+15')).pace).toBeUndefined()
+  })
+
+  it('does not eat the word hold when what follows is not a pace', () => {
+    const line = set(parseLine('4x25 free hold the wall and breathe'))
+
+    expect(line.pace).toBeUndefined()
+    expect(part(line).descriptor).toBe('free hold the wall and breathe')
+  })
+})
+
 describe('coaching notes', () => {
   it('splits the note off and leaves it out of the descriptor', () => {
     const line = set(parseLine('4x50 free @ base+25    # build 1-4'))

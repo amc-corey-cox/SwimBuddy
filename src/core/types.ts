@@ -115,7 +115,14 @@ export type ParsedLine =
       readonly kind: 'set'
       readonly reps: RepCount
       readonly parts: readonly SetPart[]
+      /** When to leave: the send-off. */
       readonly interval?: Interval
+      /**
+       * How fast to swim it. Distinct from the interval — a swimmer can be given
+       * both, and "leave every 1:30" is a different instruction from "hold 1:20".
+       * Same shape, because a pace is written the same way a send-off is.
+       */
+      readonly pace?: Interval
       readonly note?: string
       readonly raw: string
     }

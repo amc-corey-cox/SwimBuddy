@@ -101,7 +101,8 @@ export function parseLine(raw: string): ParsedLine {
 }
 
 function parseSet(raw: string, trimmed: string, note: string | undefined): ParsedLine | null {
-  const { text, interval } = splitInterval(trimmed)
+  const withoutPace = splitPace(trimmed)
+  const { text, interval } = splitInterval(withoutPace.text)
 
   const head = SET_HEAD.exec(text)
   if (!head?.[4]) return null
@@ -136,8 +137,26 @@ function parseSet(raw: string, trimmed: string, note: string | undefined): Parse
     parts: [part],
     raw,
     ...(interval ? { interval } : {}),
+    ...(withoutPace.pace ? { pace: withoutPace.pace } : {}),
     ...(note !== undefined ? { note } : {}),
   }
+}
+
+/**
+ * Splits a `hold <pace>` target off a set.
+ *
+ * Only strips it when what follows reads as a pace, so "hold the wall" stays in
+ * the descriptor rather than being eaten by a keyword.
+ */
+function splitPace(trimmed: string): { text: string; pace?: Interval } {
+  const match = /\bhold\s+(\S+)/i.exec(trimmed)
+  if (!match?.[1]) return { text: trimmed }
+
+  const pace = parseInterval(match[1])
+  if (!pace) return { text: trimmed }
+
+  const text = (trimmed.slice(0, match.index) + trimmed.slice(match.index + match[0].length)).trim()
+  return { text, pace }
 }
 
 /**
