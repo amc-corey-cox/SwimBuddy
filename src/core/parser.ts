@@ -43,7 +43,7 @@ const META_LINE = /^([A-Za-z][\w-]*):\s+(.*\S)\s*$/
  * `4x50`, `{reps:4-8}x100`, `2x1:00`, or a bare `300`. The extent is either a
  * distance or a clock duration; an interval, when present, comes after `@`.
  */
-const SET_HEAD = /^(?:(\{reps:(\d+)-(\d+)\}|\d+)\s*[x×]\s*)?(\d+:[0-5]\d|\d+)\b/
+const SET_HEAD = /^(?:(\{reps:(\d+)-(\d+)\}|\d+)\s*[x×]\s*)?(\d+:[0-5]\d|\d+)(?=\s|$)/
 
 const REPS_SLOT = /^\{reps:(\d+)-(\d+)\}$/
 
@@ -113,7 +113,16 @@ function parseSet(raw: string, trimmed: string, note: string | undefined): Parse
   if (extent === null) return null
 
   const descriptor = text.slice(head[0].length).trim()
-  const activity = recogniseActivity(descriptor)
+
+  // An activity is only attached when the catalogue says it can be measured the
+  // way this set measures it. Treading water is timed, so "100 tread water" is
+  // not a tread-water set; the words stay in the descriptor rather than
+  // producing a part the model says cannot exist.
+  const recognised = recogniseActivity(descriptor)
+  const activity =
+    recognised && (recognised.extent_kind === 'either' || recognised.extent_kind === extent.kind)
+      ? recognised
+      : undefined
 
   const part: SetPart = {
     extent,

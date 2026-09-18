@@ -211,6 +211,44 @@ describe('extents', () => {
   it.each(['abc', '', '1:75', 'base+10'])('rejects %s as an extent', (text) => {
     expect(parseExtent(text)).toBeNull()
   })
+
+  it('does not take the front of a malformed clock value', () => {
+    // 1:00:30 is not an extent. Accepting "1:00" and leaving ":30" in the
+    // descriptor would silently halve a set nobody checked.
+    expect(parseLine('1:00:30 free').kind).toBe('unparsed')
+  })
+
+  it('requires whitespace or end of line after the extent', () => {
+    expect(parseLine('100m free').kind).toBe('unparsed')
+  })
+})
+
+describe('an activity has to agree with the extent it is given', () => {
+  it('does not attach a time-only activity to a distance', () => {
+    // tread_water is measured in time. Attaching it to "100" would produce a
+    // part the model says cannot exist.
+    const line = parseLine('100 tread water')
+
+    if (line.kind !== 'set') throw new Error('expected a set')
+    expect(line.parts[0]?.activity).toBeUndefined()
+    expect(line.parts[0]?.descriptor).toBe('tread water')
+  })
+
+  it('does not attach a distance-only activity to a duration', () => {
+    const line = parseLine('1:00 fly')
+
+    if (line.kind !== 'set') throw new Error('expected a set')
+    expect(line.parts[0]?.activity).toBeUndefined()
+  })
+
+  it('accepts an either-extent activity both ways', () => {
+    const distance = parseLine('100 sculling')
+    const time = parseLine('1:00 sculling')
+
+    if (distance.kind !== 'set' || time.kind !== 'set') throw new Error('expected sets')
+    expect(distance.parts[0]?.activity).toBe('sculling')
+    expect(time.parts[0]?.activity).toBe('sculling')
+  })
 })
 
 describe('lines that are not sets', () => {
