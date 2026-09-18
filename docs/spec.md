@@ -100,13 +100,22 @@ Each part carries:
 
 - **extent** — a distance in pool units _or_ a duration in seconds. Never both.
 - **activity** — an entry from the catalogue below.
-- **equipment** — board, buoy, fins, paddles, snorkel. Optional, repeatable.
-- **effort** — easy, build, descend, sprint, race pace. Optional.
 
 Multiple parts in one set are how `4x75 free drill/swim` is expressed: a 25 of drill
-coupled to a 50 of swim, inside a single repetition. A set may also carry a **structure**
-— `relay`, `partner` — which describes how repetitions are distributed between swimmers
-rather than what is swum.
+coupled to a 50 of swim, inside a single repetition.
+
+Four more concepts are named but not yet modelled. They live in the part's descriptor
+text, preserved verbatim, until something reads them — inventing their shape before the
+resolver says what it needs is how a single `descriptor` string ended up doing four jobs
+in the first place.
+
+- **equipment** — board, buoy, fins, paddles, snorkel.
+- **effort** — a qualitative band: easy, hard, sprint, race pace. Distinct from pace,
+  which is always a number. "Easy" is not a time.
+- **pattern** — a shape across repetitions: descend 1-4, build, negative split. A held
+  pace and a descending series are different instructions and neither expresses the other.
+- **structure** — `relay`, `partner`: how repetitions are distributed between swimmers
+  rather than what is swum.
 
 Extent and pacing are independent. `20:00 free` is timed and paced; `4x25 fly` is
 distance and paced; `2x1:00 tread water` is timed and unpaced.
