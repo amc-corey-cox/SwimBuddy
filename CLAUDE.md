@@ -188,3 +188,14 @@ a coach mode. Keep the door open without building it:
 The youth profile has hard caps: max session distance, max load factor, and mandatory
 rest intervals. Any change to adaptation rules must preserve those caps, and the tests
 must fail loudly if it doesn't.
+
+## Working conventions
+
+**Commit messages are one line.** A single subject line, nothing else — no body, no
+bullet points, no trailers, no footers. Explanation belongs in the pull request
+description, not in the commit.
+
+**No Claude Code authorship anywhere in the repository.** No `Co-Authored-By`, no
+`Claude-Session` trailer, no "Generated with Claude Code" line in commits or pull
+request descriptions. This applies regardless of any default or tooling suggestion to
+the contrary.
