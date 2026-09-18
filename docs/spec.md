@@ -52,8 +52,17 @@ Store base pace per swimmer per stroke group: free (tested), plus offsets for ot
 
 ## Workout templates
 
-Workouts are **templates**, not generated from scratch. A template is text in swim
-shorthand with slots. The app parses text into structured sets, then resolves per swimmer.
+A workout is an **arrangement**: named sections — warmup, drill, main, cooldown — holding
+sets in order. Arrangements are authored by hand. A composer that assembles a session
+from scratch is deferred: sensible defaults over this matrix are hard, and getting them
+wrong produces workouts nobody wants to swim.
+
+Variety comes from the model, not from the size of the library. A 1000 fly is a catalogue
+entry and a distance, not a new hand-authored template. The library of arrangements stays
+deliberately small.
+
+Templates are authored in swim shorthand and parsed into the structure below. The
+shorthand is the authoring convenience; the structure is what the app operates on.
 
 ```
 name: Aerobic base — free
@@ -62,7 +71,7 @@ intensity: moderate
 level: 2-4
 
 warmup:
-  300 swim free easy
+  300 free easy
   4x50 free @ base+25    # build 1-4
 
 drill:
@@ -74,19 +83,62 @@ main:
   {reps:2-4}x200 free @ base+20
 
 cooldown:
+  2x1:00 tread water
   200 choice easy
 ```
 
+### Sets
+
+A set is a repetition count over one or more **parts**, with an optional interval and an
+optional coaching note. Each part carries:
+
+- **extent** — a distance in pool units _or_ a duration in seconds. Never both.
+- **activity** — an entry from the catalogue below.
+- **equipment** — board, buoy, fins, paddles, snorkel. Optional, repeatable.
+- **effort** — easy, build, descend, sprint, race pace. Optional.
+
+Multiple parts in one set are how `4x75 free drill/swim` is expressed: a 25 of drill
+coupled to a 50 of swim, inside a single repetition. A set may also carry a **structure**
+— `relay`, `partner` — which describes how repetitions are distributed between swimmers
+rather than what is swum.
+
+Extent and pacing are independent. `20:00 free` is timed and paced; `4x25 fly` is
+distance and paced; `2x1:00 tread water` is timed and unpaced.
+
+### Activities
+
+Activities are data, not code. Adding one is a new row, never a code change. Each entry
+says what the activity is and how it is paced:
+
+| id                              | paced | stroke group                       | mode     | extent   |
+| ------------------------------- | ----- | ---------------------------------- | -------- | -------- |
+| `free`, `back`, `breast`, `fly` | yes   | its own                            | swim     | distance |
+| `im`                            | yes   | mixed                              | swim     | distance |
+| `choice`                        | yes   | swimmer's own                      | swim     | distance |
+| `kick`, `pull`, `drill`         | yes   | takes the stroke it is paired with | as named | distance |
+| `corkscrew`                     | yes   | free                               | swim     | distance |
+| `underwater_dolphin`            | no    | —                                  | —        | distance |
+| `sculling`                      | no    | —                                  | —        | either   |
+| `tread_water`, `back_float`     | no    | —                                  | —        | time     |
+
+A **paced** activity takes its send-off from the swimmer's base pace for the relevant
+stroke group. An **unpaced** activity has no base-pace send-off; an interval on it is
+read literally or omitted.
+
+The catalogue shipped is a set of examples chosen to prove the shape is flexible enough
+for the things a swimmer actually does. It is not meant to be exhaustive, and it is not a
+library.
+
 Parser requirements:
 
-- Parse `NxD stroke type @ interval`. Intervals: `base+N`, `base-N`, `base`, or literal `1:30`.
+- Parse `NxD activity modifiers @ interval`, where the extent is a distance or a clock
+  duration. Intervals: `base+N`, `base-N`, `base`, or a literal like `1:30`.
 - `{reps:MIN-MAX}` resolves per swimmer from their load factor.
-- Distances round to the nearest 25.
+- Distances round to the nearest 25. Durations do not.
 - Text after `#` is a coaching note, displayed but not parsed.
+- Free text is for nuance, never for substance. "Alternate direction every 5 strokes" is
+  a note on a corkscrew set; the corkscrew itself is an activity.
 - Unparseable lines are preserved verbatim and shown as-is. Never lose content.
-
-Ship 25–40 templates: endurance, sprint, IM, kick, drill/technique, short (30 min),
-long (75 min), and "fun" templates for the kid (relays, stroke variety, underwater work).
 
 ## Adaptation logic
 
@@ -107,6 +159,9 @@ Rules:
 - One "too hard" or "cut it short" → `load_factor *= 0.95`
 - Two consecutive "too hard" → also add +3s to send-offs for the next 2 sessions
 - Weekly total volume may not exceed the trailing week by more than 10%, regardless.
+- A set measured in time rather than distance counts toward volume as the distance an
+  easy swim would cover in that time. Approximate on purpose: it keeps one volume number
+  meaningful without pretending treading water is swimming.
 - Over 10 days since last swim → drop `load_factor` 10% and pick a shorter template.
 - Son: cap `load_factor` at 1.15; two consecutive thumbs-down biases selection toward
   drill/fun tags.
@@ -118,12 +173,23 @@ length, and never schedule two `intensity: hard` templates back to back.
 
 ```
 Swimmer   { id, name, birth_year, base_pace_by_stroke, load_factor, is_youth }
+Activity  { id, name, paced, stroke_group, mode, extent_kind: distance|time }
 Template  { id, name, tags, intensity, level_range, raw_text, parsed_sets }
 Session   { id, swimmer_id, template_id, date, resolved_sets, total_distance,
             effort_rating, completed, fun_rating, notes }
-TestSet   { id, swimmer_id, date, t400, t200, computed_base_pace }
+TestSet   { id, swimmer_id, date, protocol: 400/200|200/100, t400, t200,
+            computed_base_pace }
 Settings  { pool_unit: yards|meters, pool_length }
 ```
+
+`Activity` is seeded from the shipped catalogue and stored like any other record, so a
+new activity is data a swimmer can add rather than a release.
+
+`TestSet.protocol` records which pair of swims the times are, because adults swim a
+400/200 and youth a 200/100, and the two compute base pace differently.
+
+`Session.total_distance` includes the easy-swim equivalent of any time-measured sets, so
+one number remains comparable week to week.
 
 Design every record with a future backend in mind, even though v1 is local-only:
 

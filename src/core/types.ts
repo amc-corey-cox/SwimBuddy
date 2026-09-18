@@ -63,24 +63,46 @@ export type Interval =
 export type RepCount = number | { readonly min: number; readonly max: number }
 
 /**
+ * A stroke word the parser recognised. Wider than StrokeGroup: a template may
+ * call for an IM or leave the stroke to the swimmer, neither of which has a
+ * base pace of its own.
+ */
+export type RecognisedStroke = StrokeGroup | 'im' | 'choice'
+
+/**
  * One line of a template after parsing.
  *
- * PROVISIONAL: the parser in build order step 3 owns this shape and may refine
- * it. Templates keep `raw_text` as the source of truth, and an unparseable line
- * is preserved verbatim rather than dropped — never lose content.
+ * Every variant keeps `raw`. The spec is emphatic that unparseable lines are
+ * preserved verbatim and never lost, and keeping the original text on the
+ * parsed variants too means the workout view can always fall back to it.
  */
 export type ParsedLine =
   | {
       readonly kind: 'set'
       readonly reps: RepCount
       readonly distance: number
-      readonly stroke: string
-      readonly effort?: string
+      /**
+       * Everything between the distance and the interval, verbatim: stroke,
+       * drill, equipment, whatever the author wrote. Not decomposed further,
+       * because real templates put prose here and splitting it loses content.
+       */
+      readonly descriptor: string
+      /** Set only when a stroke word was recognised; used for base pace lookup. */
+      readonly stroke?: RecognisedStroke
       readonly interval?: Interval
       readonly note?: string
       readonly raw: string
     }
+  | { readonly kind: 'meta'; readonly key: string; readonly value: string; readonly raw: string }
   | { readonly kind: 'unparsed'; readonly raw: string }
+
+/** A named block of a template: `warmup:`, `main:`, and so on. */
+export interface ParsedSection {
+  readonly name: string
+  /** The header line as written, or null for lines appearing before any header. */
+  readonly raw: string | null
+  readonly lines: readonly ParsedLine[]
+}
 
 export interface LevelRange {
   readonly min: number
@@ -93,8 +115,8 @@ export interface Template extends RecordMeta {
   readonly intensity: Intensity
   readonly level_range: LevelRange
   readonly raw_text: string
-  /** Cache of `raw_text` parsed by step 3; absent until the parser exists. */
-  readonly parsed_sets?: readonly ParsedLine[]
+  /** Cache of `raw_text` parsed by the template parser. `raw_text` stays authoritative. */
+  readonly parsed_sets?: readonly ParsedSection[]
 }
 
 export interface Session extends RecordMeta {
@@ -102,7 +124,7 @@ export interface Session extends RecordMeta {
   readonly template_id: Uuid
   readonly date: Timestamp
   /** Filled by the resolver in step 5; absent until then. */
-  readonly resolved_sets?: readonly ParsedLine[]
+  readonly resolved_sets?: readonly ParsedSection[]
   readonly total_distance: number
   readonly effort_rating: EffortRating | null
   readonly completed: boolean | null
