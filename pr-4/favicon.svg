@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Swim Buddy">
+  <rect width="32" height="32" rx="7" fill="#0b1220" />
+  <g fill="none" stroke="#3ea6ff" stroke-width="2.4" stroke-linecap="round">
+    <path d="M4 13c3 0 3 2.6 6 2.6S13 13 16 13s3 2.6 6 2.6S25 13 28 13" />
+    <path d="M4 20c3 0 3 2.6 6 2.6S13 20 16 20s3 2.6 6 2.6S25 20 28 20" />
+  </g>
+</svg>
