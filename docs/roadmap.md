@@ -15,10 +15,14 @@ Where the project is going and in what order. The spec for each step lives in
 
 ## Status
 
-Steps 1 and 2 are merged. Step 3 is in review.
+Steps 1 to 3 are merged.
 
 The set model was reworked during step 3 and the parser now targets it: extent is a
 distance or a duration, a set is repetitions over one or more parts, and activities,
 equipment, effort, patterns and structures are all catalogue data matched by shared
 rules. All five catalogues live in `src/core/` and are matched but not yet stored;
 seeding them into IndexedDB is step 4.
+
+The model itself is now generated from `schema/swimbuddy.yaml`, a LinkML schema, rather
+than hand-written TypeScript. That also produces a JSON Schema, which is what step 8's
+import path should validate against rather than trusting the file it is handed.

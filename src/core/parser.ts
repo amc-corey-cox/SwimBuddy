@@ -59,18 +59,16 @@ const CLOCK_INTERVAL = /^(\d+):([0-5]\d)$/
 
 export function parseTemplate(text: string): ParsedTemplate {
   const sections: ParsedSection[] = []
-  let current: { name: string; raw: string | null; lines: ParsedLine[] } = {
-    name: '',
-    raw: null,
-    lines: [],
-  }
+  // The leading block has no header line of its own, which is how `readMetadata`
+  // finds it later: a section without a `raw` is the one the header fields live in.
+  let current: { name: string; raw?: string; lines: ParsedLine[] } = { name: '', lines: [] }
 
   for (const raw of text.split('\n')) {
     if (raw.trim() === '') continue
 
     const header = SECTION_HEADER.exec(raw.trim())
     if (header?.[1]) {
-      if (current.lines.length > 0 || current.raw !== null) sections.push(current)
+      if (current.lines.length > 0 || current.raw !== undefined) sections.push(current)
       current = { name: header[1].toLowerCase(), raw, lines: [] }
       continue
     }
@@ -80,13 +78,13 @@ export function parseTemplate(text: string): ParsedTemplate {
     // metadata-shaped line inside `main:` is just text, and is kept as text
     // rather than silently overriding the template's intensity or level.
     current.lines.push(
-      parsed.kind === 'meta' && current.raw !== null
+      parsed.kind === 'meta' && current.raw !== undefined
         ? { kind: 'unparsed', raw: parsed.raw }
         : parsed,
     )
   }
 
-  if (current.lines.length > 0 || current.raw !== null) sections.push(current)
+  if (current.lines.length > 0 || current.raw !== undefined) sections.push(current)
 
   return { ...readMetadata(sections), sections }
 }
@@ -262,7 +260,7 @@ function parseReps(text: string | undefined): RepCount | null {
 /** Reads the header fields out of the leading block, which is the only place they live. */
 function readMetadata(sections: readonly ParsedSection[]): Omit<ParsedTemplate, 'sections'> {
   const meta = new Map<string, string>()
-  const header = sections.find((section) => section.raw === null)
+  const header = sections.find((section) => section.raw === undefined)
   for (const line of header?.lines ?? []) {
     if (line.kind === 'meta') meta.set(line.key, line.value)
   }

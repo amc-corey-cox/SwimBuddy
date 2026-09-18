@@ -6,7 +6,7 @@ import type { ParsedLine, SetPart } from './types'
 /** Every raw line the parser retained, in order. */
 function retainedLines(parsed: ParsedTemplate): string[] {
   return parsed.sections.flatMap((section) => [
-    ...(section.raw === null ? [] : [section.raw]),
+    ...(section.raw === undefined ? [] : [section.raw]),
     ...section.lines.map((line) => line.raw),
   ])
 }

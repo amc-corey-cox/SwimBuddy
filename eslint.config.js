@@ -4,7 +4,18 @@ import tseslint from 'typescript-eslint'
 import prettier from 'eslint-config-prettier'
 
 export default tseslint.config(
-  { ignores: ['dist/', 'coverage/', 'playwright-report/', 'test-results/', 'node_modules/'] },
+  {
+    ignores: [
+      'dist/',
+      'coverage/',
+      'playwright-report/',
+      'test-results/',
+      'node_modules/',
+      // Generated from schema/swimbuddy.yaml; lint it and you are linting the
+      // generator's style, not ours.
+      'src/core/model.ts',
+    ],
+  },
 
   js.configs.recommended,
 

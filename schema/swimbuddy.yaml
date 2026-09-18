@@ -1,0 +1,664 @@
+id: https://amc-corey-cox.github.io/SwimBuddy/schema
+name: swimbuddy
+title: Swim Buddy data model
+license: AGPL-3.0-or-later
+description: >-
+  The Swim Buddy data model, as the single source of truth it is generated from.
+
+  Everything in src/core/model.ts and schema/swimbuddy.schema.json comes from this
+  file; neither is edited by hand. The prose that explains *why* the model has this
+  shape lives in docs/spec.md, and descriptions here are the short version that
+  reaches a developer through generated doc comments.
+
+  Field names stay snake_case to match the spec exactly, so records map cleanly onto
+  a future sync server without a translation layer.
+
+prefixes:
+  linkml: https://w3id.org/linkml/
+  sb: https://amc-corey-cox.github.io/SwimBuddy/schema/
+  xsd: http://www.w3.org/2001/XMLSchema#
+default_prefix: sb
+
+imports:
+  - linkml:types
+
+# No default_range on purpose. An implicit string range leaks `"type": "string"`
+# alongside a union's `anyOf`, which generates `(A | B) & string` — quietly `never`.
+# Every slot below names its own range.
+
+types:
+  Timestamp:
+    uri: xsd:integer
+    base: int
+    description: Epoch milliseconds.
+  Uuid:
+    uri: xsd:string
+    base: str
+    description: A client-generated UUIDv4. Never an auto-increment integer.
+
+enums:
+  StrokeGroup:
+    permissible_values:
+      free:
+      back:
+      breast:
+      fly:
+
+  PoolUnit:
+    permissible_values:
+      yards:
+      meters:
+
+  Intensity:
+    description: How hard a whole template is meant to be.
+    permissible_values:
+      easy:
+      moderate:
+      hard:
+
+  EffortRating:
+    description: What the swimmer says afterwards. Not an effort band on a set.
+    permissible_values:
+      too_easy:
+      about_right:
+      too_hard:
+
+  FunRating:
+    description: Youth swimmers only.
+    permissible_values:
+      up:
+      down:
+
+  ActivityMode:
+    permissible_values:
+      swim:
+      kick:
+      pull:
+      drill:
+
+  ActivityExtentKind:
+    description: >-
+      How an activity can be measured. `either` means both — sculling is swum for a
+      distance or held for a time, and the set decides which.
+    permissible_values:
+      distance:
+      time:
+      either:
+
+  PatternScope:
+    description: >-
+      Where a pattern applies. `build` is the reason this exists and is two different
+      instructions: a bare "4x50 build" shapes each repetition, starting easy and
+      finishing fast within the 50, while "4x50 build 1-4" shapes the set, each
+      repetition faster than the one before it. Neither expresses the other.
+    permissible_values:
+      within_rep:
+        description: A shape inside each repetition.
+      across_set:
+        description: A shape across the repetitions.
+
+  TestProtocol:
+    description: >-
+      Which pair of swims a base pace test recorded. Adults swim a 400 and a 200,
+      youth a 200 and a 100, and the two compute base pace differently.
+    permissible_values:
+      '400/200':
+      '200/100':
+
+classes:
+  # --- The parse tree -------------------------------------------------------
+  #
+  # Three discriminated unions live here: Extent, Interval and ParsedLine. Each is
+  # an abstract parent whose children carry a `kind` pinned by `equals_string`, and
+  # each slot that holds one declares `any_of` over the children. That shape is what
+  # survives generation as a real TypeScript discriminated union; a single class
+  # with optional fields would let `{kind: distance, seconds: 60}` through.
+
+  Extent:
+    abstract: true
+    description: >-
+      How much of a thing a set part is: a distance in pool units, or a duration.
+      Never both — "20:00 free" knows its time and not its distance, and treading
+      water has no distance at all.
+
+  Distance:
+    is_a: Extent
+    description: A distance in pool units. Always a positive multiple of 25.
+    attributes:
+      kind:
+        range: string
+        required: true
+        equals_string: distance
+      value:
+        range: integer
+        required: true
+        minimum_value: 1
+
+  Duration:
+    is_a: Extent
+    description: A duration in seconds, taken as written rather than rounded.
+    attributes:
+      kind:
+        range: string
+        required: true
+        equals_string: time
+      seconds:
+        range: integer
+        required: true
+        minimum_value: 1
+
+  Interval:
+    abstract: true
+    description: >-
+      `base+15`, `base-5`, `base`, or a literal clock time like `1:30`. Used both for
+      a send-off and for a pace target, because a swimmer writes them the same way.
+
+  BaseInterval:
+    is_a: Interval
+    description: Relative to the swimmer's base pace for the relevant stroke group.
+    attributes:
+      kind:
+        range: string
+        required: true
+        equals_string: base
+      offset_seconds:
+        range: integer
+        required: true
+        description: Seconds added to base pace. Zero for a bare `base`, negative for `base-5`.
+
+  LiteralInterval:
+    is_a: Interval
+    description: An absolute time, read as written.
+    attributes:
+      kind:
+        range: string
+        required: true
+        equals_string: literal
+      seconds:
+        range: integer
+        required: true
+        minimum_value: 1
+
+  RepsSlot:
+    description: A `{reps:MIN-MAX}` slot, resolved per swimmer from their load factor.
+    attributes:
+      min:
+        range: integer
+        required: true
+        minimum_value: 1
+      max:
+        range: integer
+        required: true
+        minimum_value: 1
+
+  RepRange:
+    description: The repetitions a pattern spans — `descend 1-4` is 1 through 4.
+    attributes:
+      from:
+        range: integer
+        required: true
+        minimum_value: 1
+      to:
+        range: integer
+        required: true
+        minimum_value: 1
+
+  AppliedPattern:
+    description: A pattern as it applies to one set, resolved to a scope.
+    attributes:
+      id:
+        range: string
+        required: true
+        description: Catalogue id.
+      scope:
+        range: PatternScope
+        required: true
+      range:
+        range: RepRange
+        inlined: true
+        description: Only ever set on an `across_set` pattern; repetitions are what it counts.
+
+  SetPart:
+    description: >-
+      One activity within a set. Most sets have exactly one part; a compound set like
+      `25 drill / 50 swim` has several inside a single repetition.
+    attributes:
+      extent:
+        range: Extent
+        required: true
+        inlined: true
+        any_of:
+          - range: Distance
+          - range: Duration
+      activity:
+        range: string
+        description: Catalogue id, when the descriptor named an activity we recognise.
+      equipment:
+        range: string
+        multivalued: true
+        description: Catalogue ids, in the order the descriptor named them. Absent when none.
+      effort:
+        range: string
+        description: Catalogue id of the effort band, when the descriptor named one.
+      descriptor:
+        range: string
+        required: true
+        description: The words naming the activity and its modifiers, verbatim.
+
+  ParsedLine:
+    abstract: true
+    description: >-
+      One line of a template after parsing. Every variant keeps `raw`: unparseable
+      lines are preserved verbatim and never lost, and keeping the original text on
+      the parsed variants too means the workout view can always fall back to it.
+
+  SetLine:
+    is_a: ParsedLine
+    description: A repetition count over one or more parts.
+    attributes:
+      kind:
+        range: string
+        required: true
+        equals_string: set
+      reps:
+        required: true
+        description: A fixed count, or a `{reps:MIN-MAX}` slot resolved per swimmer.
+        any_of:
+          - range: integer
+          - range: RepsSlot
+      parts:
+        range: SetPart
+        required: true
+        multivalued: true
+        inlined_as_list: true
+        minimum_cardinality: 1
+      interval:
+        range: Interval
+        inlined: true
+        description: 'When to leave: the send-off.'
+        any_of:
+          - range: BaseInterval
+          - range: LiteralInterval
+      pace:
+        range: Interval
+        inlined: true
+        description: >-
+          How fast to swim it. Distinct from the interval — a swimmer can be given
+          both, and "leave every 1:30" is a different instruction from "hold 1:20".
+        any_of:
+          - range: BaseInterval
+          - range: LiteralInterval
+      pattern:
+        range: AppliedPattern
+        inlined: true
+        description: >-
+          A shape over the set. Scoped rather than a bare id, because the same word
+          means different things at different scopes.
+      structure:
+        range: string
+        description: 'Catalogue id: how repetitions are shared out, when they are shared at all.'
+      note:
+        range: string
+        description: Text after `#`. Displayed, never parsed.
+      raw:
+        range: string
+        required: true
+
+  MetaLine:
+    is_a: ParsedLine
+    description: 'A `key: value` header field, from the block before the first section.'
+    attributes:
+      kind:
+        range: string
+        required: true
+        equals_string: meta
+      key:
+        range: string
+        required: true
+      value:
+        range: string
+        required: true
+      raw:
+        range: string
+        required: true
+
+  UnparsedLine:
+    is_a: ParsedLine
+    description: A line the grammar does not recognise, kept exactly as written.
+    attributes:
+      kind:
+        range: string
+        required: true
+        equals_string: unparsed
+      raw:
+        range: string
+        required: true
+
+  ParsedSection:
+    description: 'A named block of a template: `warmup:`, `main:`, and so on.'
+    attributes:
+      name:
+        range: string
+        required: true
+      raw:
+        range: string
+        description: >-
+          The header line as written. Absent for the leading block, which has no
+          header of its own and is where the template's metadata lives.
+      lines:
+        range: ParsedLine
+        required: true
+        multivalued: true
+        inlined_as_list: true
+        any_of:
+          - range: SetLine
+          - range: MetaLine
+          - range: UnparsedLine
+
+  # --- The catalogues -------------------------------------------------------
+  #
+  # Activities, equipment, effort bands, patterns and structures are data rather
+  # than code: adding one is a row, never a release. They share a shape so one
+  # matcher can read them all, and each carries one field of its own.
+
+  Term:
+    abstract: true
+    description: >-
+      What every catalogue entry has in common: a stable id, a display name, and the
+      words a template author might actually write for it.
+    attributes:
+      id:
+        identifier: true
+        range: string
+        required: true
+      name:
+        range: string
+        required: true
+      aliases:
+        range: string
+        required: true
+        multivalued: true
+        minimum_cardinality: 1
+        description: >-
+          The words a template author might write for it. Matched normalised, so
+          case and stray whitespace in a row a swimmer added do not stop it matching.
+
+  Activity:
+    is_a: Term
+    description: What an activity is and how it is paced.
+    attributes:
+      paced:
+        range: boolean
+        required: true
+        description: >-
+          A paced activity takes its send-off from the swimmer's base pace for the
+          relevant stroke group. An unpaced one has none, and an interval on it is
+          read literally.
+      stroke_group:
+        range: StrokeGroup
+        description: Only ever set on a paced activity; an unpaced one has no base pace to look up.
+      mode:
+        range: ActivityMode
+      extent_kind:
+        range: ActivityExtentKind
+        required: true
+
+  Equipment:
+    is_a: Term
+    description: >-
+      Something the swimmer holds or wears. Several can apply at once — fins and a
+      snorkel is an ordinary thing to be asked for — so a part carries a list.
+    attributes:
+      implies_mode:
+        range: ActivityMode
+        description: What holding it implies about how the swimmer is moving, where it implies anything.
+
+  EffortBand:
+    is_a: Term
+    description: >-
+      A qualitative effort band. Distinct from pace, which is always a number:
+      "easy" is not a time, and no amount of arithmetic turns it into one.
+    attributes:
+      rank:
+        range: integer
+        required: true
+        minimum_value: 1
+        description: >-
+          Ordering from easiest to hardest, so a selection rule can ask which of two
+          sets is harder without parsing English. An ordering, never a pace — the gap
+          between two ranks means nothing.
+
+  Pattern:
+    is_a: Term
+    description: A shape over a set, or within each repetition of one.
+    attributes:
+      scopes:
+        range: PatternScope
+        required: true
+        multivalued: true
+        minimum_cardinality: 1
+        description: The scopes this pattern can carry, the one it means by default first.
+
+  Structure:
+    is_a: Term
+    description: How repetitions are distributed between swimmers, rather than what is swum.
+    attributes:
+      min_swimmers:
+        range: integer
+        required: true
+        minimum_value: 2
+        description: A relay is not a thing one swimmer can do alone.
+
+  # --- Stored records -------------------------------------------------------
+
+  RecordMeta:
+    abstract: true
+    description: >-
+      Every stored record carries sync metadata from day one: deletes are soft, and
+      both timestamps exist so a future backend can resolve conflicts.
+    attributes:
+      id:
+        identifier: true
+        range: Uuid
+        required: true
+      created_at:
+        range: Timestamp
+        required: true
+      updated_at:
+        range: Timestamp
+        required: true
+      deleted:
+        range: boolean
+        required: true
+
+  BasePaceByStroke:
+    description: Free is always tested; the other strokes fall back to free plus a fixed offset.
+    attributes:
+      free:
+        range: integer
+        required: true
+        minimum_value: 1
+        description: Sustainable seconds per 100, in the pool's unit.
+      back:
+        range: integer
+        minimum_value: 1
+      breast:
+        range: integer
+        minimum_value: 1
+      fly:
+        range: integer
+        minimum_value: 1
+
+  Swimmer:
+    is_a: RecordMeta
+    attributes:
+      name:
+        range: string
+        required: true
+      birth_year:
+        range: integer
+        required: true
+      base_pace_by_stroke:
+        range: BasePaceByStroke
+        required: true
+        inlined: true
+      load_factor:
+        range: float
+        required: true
+        minimum_value: 0.6
+        maximum_value: 1.4
+        description: Scales rep counts and send-offs. Clamped by the adaptation rules.
+      is_youth:
+        range: boolean
+        required: true
+
+  LevelRange:
+    attributes:
+      min:
+        range: integer
+        required: true
+      max:
+        range: integer
+        required: true
+
+  Template:
+    is_a: RecordMeta
+    description: An arrangement — named sections holding sets in order.
+    attributes:
+      name:
+        range: string
+        required: true
+      tags:
+        range: string
+        required: true
+        multivalued: true
+      intensity:
+        range: Intensity
+        required: true
+      level_range:
+        range: LevelRange
+        required: true
+        inlined: true
+      raw_text:
+        range: string
+        required: true
+        description: The template in swim shorthand. Authoritative; everything else is derived.
+      parsed_sets:
+        range: ParsedSection
+        multivalued: true
+        inlined_as_list: true
+        description: Cache of `raw_text` parsed by the template parser.
+
+  Session:
+    is_a: RecordMeta
+    description: >-
+      One swim. Swims are not measured: a session records how it felt, and the
+      adaptation rules run off that.
+    attributes:
+      swimmer_id:
+        range: Uuid
+        required: true
+      template_id:
+        range: Uuid
+        required: true
+      date:
+        range: Timestamp
+        required: true
+      resolved_sets:
+        range: ParsedSection
+        multivalued: true
+        inlined_as_list: true
+        description: Filled by the resolver in step 5; absent until then.
+      total_distance:
+        range: integer
+        required: true
+        description: >-
+          Includes the easy-swim equivalent of any time-measured sets, so one number
+          stays comparable week to week.
+      effort_rating:
+        range: EffortRating
+        description: Absent until the swimmer rates the session.
+      completed:
+        range: boolean
+        description: Whether the main set was finished. Absent until the swimmer says.
+      fun_rating:
+        range: FunRating
+        description: Youth swimmers only.
+      notes:
+        range: string
+        required: true
+
+  TestSet:
+    is_a: RecordMeta
+    description: A base pace test.
+    attributes:
+      swimmer_id:
+        range: Uuid
+        required: true
+      date:
+        range: Timestamp
+        required: true
+      protocol:
+        range: TestProtocol
+        required: true
+      t400:
+        range: integer
+        required: true
+        minimum_value: 1
+        description: 'Seconds for the longer swim: the 400, or the 200 under the youth protocol.'
+      t200:
+        range: integer
+        required: true
+        minimum_value: 1
+        description: 'Seconds for the shorter swim: the 200, or the 100 under the youth protocol.'
+      computed_base_pace:
+        range: integer
+        required: true
+        minimum_value: 1
+
+  Settings:
+    is_a: RecordMeta
+    attributes:
+      pool_unit:
+        range: PoolUnit
+        required: true
+      pool_length:
+        range: integer
+        required: true
+        minimum_value: 1
+
+  StoreSnapshot:
+    tree_root: true
+    description: >-
+      The whole store, which is also the shape of the JSON export/import file. This
+      is the schema's tree root, so the generated JSON Schema validates an import
+      file directly.
+    attributes:
+      version:
+        range: integer
+        required: true
+        description: Bumped whenever a migration is added.
+      swimmers:
+        range: Swimmer
+        required: true
+        multivalued: true
+        inlined_as_list: true
+      templates:
+        range: Template
+        required: true
+        multivalued: true
+        inlined_as_list: true
+      sessions:
+        range: Session
+        required: true
+        multivalued: true
+        inlined_as_list: true
+      test_sets:
+        range: TestSet
+        required: true
+        multivalued: true
+        inlined_as_list: true
+      settings:
+        range: Settings
+        required: true
+        inlined: true
