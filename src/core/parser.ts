@@ -149,7 +149,12 @@ function parseSet(raw: string, trimmed: string, note: string | undefined): Parse
  * the descriptor rather than being eaten by a keyword.
  */
 function splitPace(trimmed: string): { text: string; pace?: Interval } {
-  const match = /\bhold\s+(\S+)/i.exec(trimmed)
+  // The candidate spans an optional spaced offset, because `hold base + 15` is
+  // valid wherever `@ base + 15` is and capturing only `base` would drop the
+  // offset into the descriptor and silently prescribe the wrong pace.
+  // Deliberately loose: parseInterval stays the single judge of what a pace is,
+  // rather than this regex growing a second copy of that grammar.
+  const match = /\bhold\s+(\S+(?:\s*[+-]\s*\d+)?)/i.exec(trimmed)
   if (!match?.[1]) return { text: trimmed }
 
   const pace = parseInterval(match[1])

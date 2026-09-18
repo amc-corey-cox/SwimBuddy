@@ -147,6 +147,19 @@ describe('pace', () => {
     expect(set(parseLine('8x100 free @ base+15')).pace).toBeUndefined()
   })
 
+  it.each([
+    ['8x100 free hold base + 15', { kind: 'base', offset_seconds: 15 }],
+    ['8x100 free hold base - 5', { kind: 'base', offset_seconds: -5 }],
+    ['8x100 free hold base +15', { kind: 'base', offset_seconds: 15 }],
+  ])('reads the spaced form in %s', (raw, expected) => {
+    // `@ base + 15` already worked, so `hold base + 15` failing would have been a
+    // silent halving of the offset rather than a visible error.
+    const line = set(parseLine(raw))
+
+    expect(line.pace).toEqual(expected)
+    expect(part(line).descriptor).toBe('free')
+  })
+
   it('does not eat the word hold when what follows is not a pace', () => {
     const line = set(parseLine('4x25 free hold the wall and breathe'))
 
