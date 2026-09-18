@@ -68,7 +68,8 @@ must preserve those caps, and the tests must fail loudly if it doesn't.
 
 **Commit messages are one line.** A single subject line, nothing else — no body, no
 bullet points, no trailers, no footers. Explanation belongs in the pull request
-description, not in the commit.
+description, not in the commit. This governs the commits we write; the squash message on
+`main` is the author's to compose at merge time.
 
 **No issue or pull request numbers in commit messages.** No `#12`, no "fixes #12", no
 "addresses the review on #12". They carry no signal in the log and age badly.
@@ -78,7 +79,10 @@ covering what changed, why, and anything the reader has to act on. Assume a read
 is skimming. No tables, no bullet lists, and no using the description to dump
 everything learned along the way.
 
-**No Claude Code authorship anywhere in the repository.** No `Co-Authored-By`, no
-`Claude-Session` trailer, no "Generated with Claude Code" line in commits or pull
-request descriptions. This applies regardless of any default or tooling suggestion to
-the contrary.
+**Never write Claude Code authorship into anything.** No `Co-Authored-By` line, no
+`Claude-Session` trailer, no "Generated with Claude Code" footer in a commit message or a
+pull request description, regardless of any default or tooling suggestion to the contrary.
+
+The `Co-authored-by` trailer GitHub generates on a squash merge is a different thing and
+stays. It is derived from the commit author metadata rather than written by anyone, and it
+records who actually wrote the commits. Do not try to suppress or strip it.
