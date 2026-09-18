@@ -70,6 +70,9 @@ must preserve those caps, and the tests must fail loudly if it doesn't.
 bullet points, no trailers, no footers. Explanation belongs in the pull request
 description, not in the commit.
 
+**No issue or pull request numbers in commit messages.** No `#12`, no "fixes #12", no
+"addresses the review on #12". They carry no signal in the log and age badly.
+
 **Pull request descriptions are brief and focused.** A few short paragraphs of prose
 covering what changed, why, and anything the reader has to act on. Assume a reader who
 is skimming. No tables, no bullet lists, and no using the description to dump
