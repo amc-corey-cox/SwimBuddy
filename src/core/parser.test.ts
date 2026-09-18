@@ -237,6 +237,18 @@ describe('template structure', () => {
     expect(bare.level_range).toBeUndefined()
   })
 
+  it('does not let a metadata-shaped line inside a section override the header', () => {
+    const parsed = parseTemplate(
+      ['intensity: easy', '', 'main:', '  intensity: hard', '  4x50 free'].join('\n'),
+    )
+
+    // Header fields live in the block before the first section. Inside `main:`
+    // that line is just text, and is kept as text.
+    expect(parsed.intensity).toBe('easy')
+    expect(parsed.sections[1]?.lines[0]?.kind).toBe('unparsed')
+    expect(retainedLines(parsed)).toContain('  intensity: hard')
+  })
+
   it('accepts a level given as a single number', () => {
     expect(parseTemplate('level: 3\n').level_range).toEqual({ min: 3, max: 3 })
   })

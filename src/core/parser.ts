@@ -55,7 +55,7 @@ const SET_HEAD = /^(?:(\{reps:(\d+)-(\d+)\}|\d+)\s*[x×]\s*)?(\d+)\b/
 
 const REPS_SLOT = /^\{reps:(\d+)-(\d+)\}$/
 
-/** `base`, `base+15`, `base-5`, `1:30`, `0:45`, or a bare number of seconds. */
+/** The whole interval grammar: `base`, `base+15`, `base-5`, or a clock time like `1:30`. */
 const BASE_INTERVAL = /^base\s*([+-]\s*\d+)?$/i
 const CLOCK_INTERVAL = /^(\d+):([0-5]\d)$/
 
@@ -77,7 +77,15 @@ export function parseTemplate(text: string): ParsedTemplate {
       continue
     }
 
-    current.lines.push(parseLine(raw))
+    const parsed = parseLine(raw)
+    // Header fields only exist in the block before the first section. A
+    // metadata-shaped line inside `main:` is just text, and is kept as text
+    // rather than silently overriding the template's intensity or level.
+    current.lines.push(
+      parsed.kind === 'meta' && current.raw !== null
+        ? { kind: 'unparsed', raw: parsed.raw }
+        : parsed,
+    )
   }
 
   if (current.lines.length > 0 || current.raw !== null) sections.push(current)
@@ -198,13 +206,12 @@ function recogniseStroke(descriptor: string): RecognisedStroke | undefined {
   return undefined
 }
 
-/** Reads the header fields out of the parsed metadata lines. */
+/** Reads the header fields out of the leading block, which is the only place they live. */
 function readMetadata(sections: readonly ParsedSection[]): Omit<ParsedTemplate, 'sections'> {
   const meta = new Map<string, string>()
-  for (const section of sections) {
-    for (const line of section.lines) {
-      if (line.kind === 'meta') meta.set(line.key, line.value)
-    }
+  const header = sections.find((section) => section.raw === null)
+  for (const line of header?.lines ?? []) {
+    if (line.kind === 'meta') meta.set(line.key, line.value)
   }
 
   const name = meta.get('name')
