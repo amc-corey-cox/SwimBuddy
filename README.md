@@ -4,7 +4,8 @@ A local-first swim workout PWA for one family. Generates workouts scaled to each
 swimmer's fitness and adapts them from post-swim feedback. No accounts, no telemetry,
 no subscriptions, works offline at the pool.
 
-Full spec and build order: [`CLAUDE.md`](CLAUDE.md).
+Full spec: [`docs/spec.md`](docs/spec.md). Build order: [`docs/roadmap.md`](docs/roadmap.md).
+How development is done: [`CLAUDE.md`](CLAUDE.md).
 
 ## Status
 
