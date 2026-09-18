@@ -194,6 +194,34 @@ describe('test sets', () => {
   })
 })
 
+describe('collection methods survive being destructured', () => {
+  it('latestForSwimmer works when pulled off the collection', async () => {
+    const swimmer = await store.swimmers.create({ ...aSwimmer })
+    await store.testSets.create({
+      swimmer_id: swimmer.id,
+      date: START,
+      protocol: '400/200',
+      t400: 370,
+      t200: 180,
+      computed_base_pace: 95,
+    })
+
+    // Public API: a caller may reasonably destructure it, and `this` would be
+    // undefined if the implementation leaned on it.
+    const { latestForSwimmer } = store.testSets
+    expect((await latestForSwimmer(swimmer.id))?.computed_base_pace).toBe(95)
+  })
+
+  it('forSwimmer works when pulled off either collection', async () => {
+    const swimmer = await store.swimmers.create({ ...aSwimmer })
+    const sessionsFor = store.sessions.forSwimmer
+    const testSetsFor = store.testSets.forSwimmer
+
+    expect(await sessionsFor(swimmer.id)).toEqual([])
+    expect(await testSetsFor(swimmer.id)).toEqual([])
+  })
+})
+
 describe('settings', () => {
   it('returns the spec defaults before anything is stored', async () => {
     const settings = await store.getSettings()

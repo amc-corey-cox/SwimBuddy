@@ -25,24 +25,30 @@ export interface ReadOptions {
   readonly includeDeleted?: boolean
 }
 
+/**
+ * Every method is declared `this: void` on purpose. These are public API, and a
+ * caller may reasonably pull one off the object — `const { list } = store.swimmers`.
+ * The annotation makes an implementation that leans on `this` a compile error
+ * rather than a runtime one that only shows up at the point of destructuring.
+ */
 export interface Collection<T extends RecordMeta> {
-  list(options?: ReadOptions): Promise<T[]>
-  get(id: Uuid, options?: ReadOptions): Promise<T | undefined>
-  create(input: RecordInput<T>): Promise<T>
-  update(id: Uuid, patch: RecordPatch<T>): Promise<T>
+  list(this: void, options?: ReadOptions): Promise<T[]>
+  get(this: void, id: Uuid, options?: ReadOptions): Promise<T | undefined>
+  create(this: void, input: RecordInput<T>): Promise<T>
+  update(this: void, id: Uuid, patch: RecordPatch<T>): Promise<T>
   /** Soft delete: the row stays, flagged, so a future sync can propagate it. */
-  remove(id: Uuid): Promise<T>
+  remove(this: void, id: Uuid): Promise<T>
   /** Permanently removes the row. Only for import/wipe, never for user deletes. */
-  purge(id: Uuid): Promise<void>
+  purge(this: void, id: Uuid): Promise<void>
 }
 
 export interface SessionCollection extends Collection<Session> {
-  forSwimmer(swimmerId: Uuid, options?: ReadOptions): Promise<Session[]>
+  forSwimmer(this: void, swimmerId: Uuid, options?: ReadOptions): Promise<Session[]>
 }
 
 export interface TestSetCollection extends Collection<TestSet> {
-  forSwimmer(swimmerId: Uuid, options?: ReadOptions): Promise<TestSet[]>
-  latestForSwimmer(swimmerId: Uuid): Promise<TestSet | undefined>
+  forSwimmer(this: void, swimmerId: Uuid, options?: ReadOptions): Promise<TestSet[]>
+  latestForSwimmer(this: void, swimmerId: Uuid): Promise<TestSet | undefined>
 }
 
 export interface SwimBuddyStore {
@@ -165,14 +171,18 @@ export async function openStore(options: OpenStoreOptions = {}): Promise<SwimBud
     },
   }
 
+  // Declared as a standalone function rather than a method, so it keeps working
+  // when a caller destructures it off the collection — `this` would be undefined.
+  async function testSetsForSwimmer(swimmerId: Uuid, options?: ReadOptions): Promise<TestSet[]> {
+    const found = await database.getAllFromIndex('test_sets', 'by_swimmer', swimmerId)
+    return visible(found, options).sort((a, b) => a.date - b.date)
+  }
+
   const testSets: TestSetCollection = {
     ...testSetBase,
-    async forSwimmer(swimmerId, options) {
-      const found = await database.getAllFromIndex('test_sets', 'by_swimmer', swimmerId)
-      return visible(found, options).sort((a, b) => a.date - b.date)
-    },
+    forSwimmer: testSetsForSwimmer,
     async latestForSwimmer(swimmerId) {
-      const found = await this.forSwimmer(swimmerId)
+      const found = await testSetsForSwimmer(swimmerId)
       return found.at(-1)
     },
   }

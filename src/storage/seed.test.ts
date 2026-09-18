@@ -108,6 +108,19 @@ describe('seeding is safe to call repeatedly', () => {
     expect(await store.swimmers.list()).toEqual([])
   })
 
+  it('does not report tombstoned swimmers back to the caller', async () => {
+    const { swimmers } = await seedIfEmpty(store, { referenceDate: REFERENCE })
+    for (const swimmer of swimmers) {
+      await store.swimmers.remove(swimmer.id)
+    }
+
+    const again = await seedIfEmpty(store, { referenceDate: REFERENCE })
+
+    // The emptiness check deliberately counts tombstones, but the returned list
+    // should match what a normal read shows — callers render it.
+    expect(again.swimmers).toEqual([])
+  })
+
   it('does not seed over a store that already has one swimmer', async () => {
     await store.swimmers.create({
       name: 'Existing',

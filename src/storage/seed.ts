@@ -47,9 +47,11 @@ export async function seedIfEmpty(
   store: SwimBuddyStore,
   options: SeedOptions = {},
 ): Promise<SeedResult> {
+  // The decision to seed counts tombstones; the list handed back to the caller
+  // does not. Callers render this, and every other read hides deleted rows.
   const existing = await store.swimmers.list({ includeDeleted: true })
   if (existing.length > 0) {
-    return { seeded: false, swimmers: existing }
+    return { seeded: false, swimmers: existing.filter((swimmer) => !swimmer.deleted) }
   }
 
   const referenceDate = options.referenceDate ?? Date.now()
