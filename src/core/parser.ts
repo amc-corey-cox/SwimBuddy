@@ -1,5 +1,11 @@
 import { roundToNearest25 } from './units'
 import { recogniseActivity } from './activities'
+import {
+  recogniseEffort,
+  recogniseEquipment,
+  recognisePattern,
+  recogniseStructure,
+} from './modifiers'
 import type {
   Extent,
   Intensity,
@@ -125,11 +131,23 @@ function parseSet(raw: string, trimmed: string, note: string | undefined): Parse
       ? recognised
       : undefined
 
+  // Equipment and effort describe the swimming, so they sit on the part. A
+  // pattern and a structure describe the repetitions, so they sit on the set.
+  // None of them consume the descriptor: recognising a word is additive, and
+  // the words stay verbatim for anything the catalogues do not know.
+  const equipment = recogniseEquipment(descriptor)
+  const effort = recogniseEffort(descriptor)
+
   const part: SetPart = {
     extent,
     descriptor,
     ...(activity ? { activity: activity.id } : {}),
+    ...(equipment.length > 0 ? { equipment } : {}),
+    ...(effort ? { effort: effort.id } : {}),
   }
+
+  const pattern = recognisePattern(descriptor)
+  const structure = recogniseStructure(descriptor)
 
   return {
     kind: 'set',
@@ -138,6 +156,8 @@ function parseSet(raw: string, trimmed: string, note: string | undefined): Parse
     raw,
     ...(interval ? { interval } : {}),
     ...(withoutPace.pace ? { pace: withoutPace.pace } : {}),
+    ...(pattern ? { pattern } : {}),
+    ...(structure ? { structure: structure.id } : {}),
     ...(note !== undefined ? { note } : {}),
   }
 }

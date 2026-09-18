@@ -72,7 +72,7 @@ level: 2-4
 
 warmup:
   300 free easy
-  4x50 free @ base+25    # build 1-4
+  4x50 free build 1-4 @ base+25
 
 drill:
   4x75 free drill/swim @ base+30
@@ -90,7 +90,8 @@ cooldown:
 ### Sets
 
 A set is a repetition count over one or more **parts**, carrying an optional **interval**,
-an optional **pace**, and an optional coaching note.
+an optional **pace**, an optional **pattern**, an optional **structure**, and an optional
+coaching note.
 
 Interval and pace are different instructions and a swimmer can be given both: `@ base+15`
 says when to leave, `hold 1:20` says how fast to swim it. Both are optional — plenty of
@@ -100,22 +101,31 @@ Each part carries:
 
 - **extent** — a distance in pool units _or_ a duration in seconds. Never both.
 - **activity** — an entry from the catalogue below.
+- **equipment** — nothing, or several entries from the equipment catalogue. Fins and a
+  snorkel at the same time is an ordinary thing to be asked for, so this is a list.
+- **effort** — a qualitative band. Distinct from pace, which is always a number: "easy"
+  is not a time, and no amount of arithmetic turns it into one.
 
 Multiple parts in one set are how `4x75 free drill/swim` is expressed: a 25 of drill
 coupled to a 50 of swim, inside a single repetition.
 
-Four more concepts are named but not yet modelled. They live in the part's descriptor
-text, preserved verbatim, until something reads them — inventing their shape before the
-resolver says what it needs is how a single `descriptor` string ended up doing four jobs
-in the first place.
+Pattern and structure describe the repetitions rather than the swimming, so they sit on
+the set rather than on a part:
 
-- **equipment** — board, buoy, fins, paddles, snorkel.
-- **effort** — a qualitative band: easy, hard, sprint, race pace. Distinct from pace,
-  which is always a number. "Easy" is not a time.
-- **pattern** — a shape across repetitions: descend 1-4, build, negative split. A held
-  pace and a descending series are different instructions and neither expresses the other.
-- **structure** — `relay`, `partner`: how repetitions are distributed between swimmers
-  rather than what is swum.
+- **pattern** — a shape, carrying the **scope** it applies at. `build` is two different
+  instructions and the scope is which one is meant: `4x50 build` shapes each repetition,
+  easy into the wall and fast off it, while `4x50 build 1-4` shapes the set, each 50
+  faster than the one before. A trailing repetition range is what tells them apart.
+  `descend` only ever counts repetitions; a negative split only ever happens inside one
+  swim. A held pace and a descending series are different instructions and neither
+  expresses the other.
+- **structure** — `relay`, `partner`, `pace line`: how repetitions are distributed
+  between swimmers rather than what is swum. Every structure needs more than one swimmer.
+
+Recognising any of these never consumes the words. The descriptor is kept verbatim
+either way, so a term the catalogues do not know still reaches the swimmer exactly as
+the author wrote it. The catalogues are examples, and the shorthand has to survive words
+they have never seen.
 
 Extent and pacing are independent. `20:00 free` is timed and paced; `4x25 fly` is
 distance and paced; `2x1:00 tread water` is timed and unpaced.
@@ -144,6 +154,25 @@ The catalogue shipped is a set of examples chosen to prove the shape is flexible
 for the things a swimmer actually does. It is not meant to be exhaustive, and it is not a
 library.
 
+### Modifier catalogues
+
+Equipment, effort, pattern and structure are data on the same terms as activities, share
+the same shape — a stable id, a display name, and the words an author might write — and
+are matched by the same rules. Each carries one field of its own:
+
+| catalogue | entries                                                                    | carries                                                      |
+| --------- | -------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| equipment | board, buoy, fins, paddles, snorkel, band                                  | `implies_mode` — a board means kicking, a buoy means pulling |
+| effort    | recovery, easy, steady, strong, threshold, hard, race pace, sprint         | `rank`, easiest to hardest                                   |
+| pattern   | build, descend, ascend, alternate, ladder, pyramid, negative split, broken | `scopes` it can carry, the one it means by default first     |
+| structure | relay, partner, pace line                                                  | `min_swimmers`                                               |
+
+`rank` exists so a selection rule can ask which of two sets is harder without parsing
+English. It is an ordering and never a pace; the gap between two ranks means nothing.
+
+No modifier may claim a word an activity already means. A word has one meaning per
+descriptor, or `50 kick` parses two ways depending on which catalogue was read first.
+
 Parser requirements:
 
 - Parse `NxD activity modifiers @ interval`, where the extent is a distance or a clock
@@ -152,6 +181,12 @@ Parser requirements:
 - Distances round to the nearest 25. Durations do not.
 - `hold <pace>` sets a pace target, written like an interval. It is only read as one when
   what follows is a pace, so "hold the wall" stays in the descriptor.
+- Modifiers are recognised inside the descriptor and never removed from it. Recognition
+  is additive: the words survive whether or not a catalogue knows them.
+- A pattern followed by a repetition range — `descend 1-4` — is a shape across the set.
+  Without one it is a shape within each repetition, where the pattern allows both. A
+  range on a pattern whose scope cannot carry one is left in the descriptor rather than
+  recorded as a span that means nothing.
 - Text after `#` is a coaching note, displayed but not parsed.
 - Free text is for nuance, never for substance. "Alternate direction every 5 strokes" is
   a note on a corkscrew set; the corkscrew itself is an activity.
@@ -190,7 +225,11 @@ length, and never schedule two `intensity: hard` templates back to back.
 
 ```
 Swimmer   { id, name, birth_year, base_pace_by_stroke, load_factor, is_youth }
-Activity  { id, name, paced, stroke_group, mode, extent_kind: distance|time }
+Activity  { id, name, aliases, paced, stroke_group, mode, extent_kind: distance|time }
+Equipment { id, name, aliases, implies_mode }
+EffortBand{ id, name, aliases, rank }
+Pattern   { id, name, aliases, scopes }
+Structure { id, name, aliases, min_swimmers }
 Template  { id, name, tags, intensity, level_range, raw_text, parsed_sets }
 Session   { id, swimmer_id, template_id, date, resolved_sets, total_distance,
             effort_rating, completed, fun_rating, notes }
@@ -199,8 +238,9 @@ TestSet   { id, swimmer_id, date, protocol: 400/200|200/100, t400, t200,
 Settings  { pool_unit: yards|meters, pool_length }
 ```
 
-`Activity` is seeded from the shipped catalogue and stored like any other record, so a
-new activity is data a swimmer can add rather than a release.
+`Activity` and the four modifier catalogues are seeded from the shipped data and stored
+like any other record, so a new activity — or a new piece of kit — is data a swimmer can
+add rather than a release.
 
 `TestSet.protocol` records which pair of swims the times are, because adults swim a
 400/200 and youth a 200/100, and the two compute base pace differently.

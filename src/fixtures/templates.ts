@@ -36,7 +36,7 @@ export function demoTemplates(referenceDate: number = FIXTURE_REFERENCE_DATE): T
         '',
         'warmup:',
         '  300 swim free easy',
-        '  4x50 free @ base+25    # build 1-4',
+        '  4x50 free build 1-4 @ base+25',
         '',
         'drill:',
         '  4x75 free drill/swim @ base+30',

@@ -175,6 +175,9 @@ describe('coaching notes', () => {
     expect(line.note).toBe('build 1-4')
     expect(part(line).descriptor).toBe('free')
     expect(line.interval).toEqual({ kind: 'base', offset_seconds: 25 })
+    // A note is displayed, never parsed — including when it is full of words
+    // the pattern catalogue would otherwise recognise.
+    expect(line.pattern).toBeUndefined()
   })
 
   it('does not parse the note, however set-like it looks', () => {
@@ -297,6 +300,102 @@ describe('an activity has to agree with the extent it is given', () => {
     if (distance.kind !== 'set' || time.kind !== 'set') throw new Error('expected sets')
     expect(distance.parts[0]?.activity).toBe('sculling')
     expect(time.parts[0]?.activity).toBe('sculling')
+  })
+})
+
+describe('equipment and effort on the part', () => {
+  it('reads the kit the set asks the swimmer to carry', () => {
+    expect(part(parseLine('4x50 kick with board @ base+40')).equipment).toEqual(['board'])
+  })
+
+  it('reads more than one piece of kit', () => {
+    expect(part(parseLine('8x50 free with fins and paddles')).equipment).toEqual([
+      'fins',
+      'paddles',
+    ])
+  })
+
+  it('reads the effort band', () => {
+    expect(part(parseLine('300 free easy')).effort).toBe('easy')
+  })
+
+  it('leaves both off a set that prescribes neither', () => {
+    const bare = part(parseLine('8x100 free @ base+15'))
+
+    expect(bare.equipment).toBeUndefined()
+    expect(bare.effort).toBeUndefined()
+  })
+
+  it('keeps the descriptor verbatim, because recognising a word never eats it', () => {
+    // The catalogues are examples, not an exhaustive library. Anything they do
+    // not know still has to reach the swimmer exactly as the author wrote it.
+    const line = part(parseLine('4x50 kick with board, toes pointed'))
+
+    expect(line.descriptor).toBe('kick with board, toes pointed')
+    expect(line.equipment).toEqual(['board'])
+  })
+
+  it('does not confuse an effort band with a pace', () => {
+    const line = set(parseLine('8x100 free hard hold 1:20'))
+
+    expect(part(line).effort).toBe('hard')
+    expect(line.pace).toEqual({ kind: 'literal', seconds: 80 })
+  })
+})
+
+describe('pattern and structure on the set', () => {
+  it('reads a bare build as a shape inside each repetition', () => {
+    expect(set(parseLine('4x50 free build @ base+25')).pattern).toEqual({
+      id: 'build',
+      scope: 'within_rep',
+    })
+  })
+
+  it('reads a build over a range of repetitions as a shape across the set', () => {
+    // Same word, different instruction: "4x50 build" says how to swim each 50,
+    // "4x50 build 1-4" says how the fourth compares to the first.
+    expect(set(parseLine('4x50 free build 1-4 @ base+25')).pattern).toEqual({
+      id: 'build',
+      scope: 'across_set',
+      range: { from: 1, to: 4 },
+    })
+  })
+
+  it('reads descend as across the set', () => {
+    expect(set(parseLine('8x100 free descend 1-4 @ base+15')).pattern).toEqual({
+      id: 'descend',
+      scope: 'across_set',
+      range: { from: 1, to: 4 },
+    })
+  })
+
+  it('reads a structure', () => {
+    expect(set(parseLine('4x25 free relay')).structure).toBe('relay')
+  })
+
+  it('leaves both off a set that has neither', () => {
+    const line = set(parseLine('8x100 free @ base+15'))
+
+    expect(line.pattern).toBeUndefined()
+    expect(line.structure).toBeUndefined()
+  })
+
+  it('keeps a pattern and a pace apart, since a held pace is not a descending series', () => {
+    const line = set(parseLine('8x100 free descend 1-4 hold 1:20'))
+
+    expect(line.pattern?.id).toBe('descend')
+    expect(line.pace).toEqual({ kind: 'literal', seconds: 80 })
+  })
+
+  it('reads all four slots off one line without losing the descriptor', () => {
+    const line = set(parseLine('4x50 free build 1-4 with fins, relay hard @ base+20'))
+
+    expect(part(line).equipment).toEqual(['fins'])
+    expect(part(line).effort).toBe('hard')
+    expect(line.pattern).toEqual({ id: 'build', scope: 'across_set', range: { from: 1, to: 4 } })
+    expect(line.structure).toBe('relay')
+    expect(part(line).descriptor).toBe('free build 1-4 with fins, relay hard')
+    expect(line.interval).toEqual({ kind: 'base', offset_seconds: 20 })
   })
 })
 

@@ -1,3 +1,4 @@
+import { byAliasLength, matchTerm, termById, type AliasIndex } from './terms'
 import type { Activity } from './types'
 
 /**
@@ -126,34 +127,16 @@ export const ACTIVITIES: readonly Activity[] = [
   },
 ]
 
-/**
- * Aliases longest first, so "underwater dolphin" wins over "dolphin kick" and
- * "back float" is never matched as "back".
- */
-const BY_ALIAS_LENGTH: readonly (readonly [string, Activity])[] = ACTIVITIES.flatMap((activity) =>
-  activity.aliases.map((alias) => [alias, activity] as const),
-).sort((a, b) => b[0].length - a[0].length)
+const BY_ALIAS_LENGTH = byAliasLength(ACTIVITIES)
 
 export function activityById(id: string): Activity | undefined {
-  return ACTIVITIES.find((activity) => activity.id === id)
+  return termById(id, ACTIVITIES)
 }
 
-/**
- * Finds the activity a descriptor names, searching longest alias first.
- *
- * Deliberately matches anywhere in the descriptor rather than only at the front:
- * "kick with board" and "easy free" both name an activity, and the modifiers sit
- * on either side of it.
- */
+/** Finds the activity a descriptor names, searching longest alias first. */
 export function recogniseActivity(
   descriptor: string,
-  catalogue: readonly (readonly [string, Activity])[] = BY_ALIAS_LENGTH,
+  catalogue: AliasIndex<Activity> = BY_ALIAS_LENGTH,
 ): Activity | undefined {
-  const text = descriptor.toLowerCase()
-  for (const [alias, activity] of catalogue) {
-    if (new RegExp(`\\b${alias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(text)) {
-      return activity
-    }
-  }
-  return undefined
+  return matchTerm(descriptor, catalogue)?.term
 }
