@@ -195,6 +195,11 @@ must fail loudly if it doesn't.
 bullet points, no trailers, no footers. Explanation belongs in the pull request
 description, not in the commit.
 
+**Pull request descriptions are brief and focused.** A few short paragraphs of prose
+covering what changed, why, and anything the reader has to act on. Assume a reader who
+is skimming. No tables, no bullet lists, and no using the description to dump
+everything learned along the way.
+
 **No Claude Code authorship anywhere in the repository.** No `Co-Authored-By`, no
 `Claude-Session` trailer, no "Generated with Claude Code" line in commits or pull
 request descriptions. This applies regardless of any default or tooling suggestion to
