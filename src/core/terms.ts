@@ -25,7 +25,7 @@ export interface TermMatch<T extends Term> {
  */
 export function byAliasLength<T extends Term>(terms: readonly T[]): AliasIndex<T> {
   return terms
-    .flatMap((term) => term.aliases.map((alias) => [alias, term] as const))
+    .flatMap((term) => term.aliases.map((alias) => [alias.trim().toLowerCase(), term] as const))
     .sort((a, b) => b[0].length - a[0].length)
 }
 
@@ -88,7 +88,15 @@ export function matchTerms<T extends Term>(
   return found.sort((a, b) => a.index - b.index)
 }
 
-/** Word-bounded and case-insensitive, so "carefree" never names freestyle. */
+/**
+ * Word-bounded and case-insensitive, so "carefree" never names freestyle.
+ *
+ * The alias is normalised, not just the descriptor. These catalogues become
+ * records a swimmer can add, so an alias typed as "IM" or with a stray space
+ * around it has to match all the same — lowercasing only one side would leave
+ * such a row silently unmatchable, which is the worst way for it to fail.
+ */
 function aliasPattern(alias: string): RegExp {
-  return new RegExp(`\\b${alias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'g')
+  const normalised = alias.trim().toLowerCase()
+  return new RegExp(`\\b${normalised.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'g')
 }

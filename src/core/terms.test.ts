@@ -47,6 +47,22 @@ describe('matchTerm', () => {
     expect(matchTerm('Flippers', INDEX)?.term.id).toBe('fins')
   })
 
+  it('is case insensitive about the alias too, not just the descriptor', () => {
+    // The catalogues become records a swimmer can add, so an alias typed as
+    // "IM" has to match "4x100 im". Lowercasing only one side would leave that
+    // row silently unmatchable.
+    const shouty = byAliasLength([{ id: 'im', name: 'IM', aliases: ['IM'] }])
+
+    expect(matchTerm('4x100 im', shouty)?.term.id).toBe('im')
+    expect(matchTerm('4x100 IM', shouty)?.term.id).toBe('im')
+  })
+
+  it('tolerates an alias with stray whitespace around it', () => {
+    const padded = byAliasLength([{ id: 'fins', name: 'Fins', aliases: [' fins '] }])
+
+    expect(matchTerm('free with fins', padded)?.term.id).toBe('fins')
+  })
+
   it('returns undefined when the descriptor names nothing', () => {
     expect(matchTerm('', INDEX)).toBeUndefined()
   })

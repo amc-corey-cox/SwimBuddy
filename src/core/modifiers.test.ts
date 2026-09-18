@@ -12,6 +12,9 @@ import {
 import { ACTIVITIES } from './activities'
 import type { Term } from './types'
 
+/** The matcher normalises aliases, so assertions about them have to as well. */
+const normalise = (alias: string): string => alias.trim().toLowerCase()
+
 const CATALOGUES: readonly (readonly [string, readonly Term[]])[] = [
   ['equipment', EQUIPMENT],
   ['efforts', EFFORTS],
@@ -26,7 +29,7 @@ describe('the shipped catalogues', () => {
   })
 
   it.each(CATALOGUES)('never lets two %s entries claim the same alias', (_name, terms) => {
-    const aliases = terms.flatMap((term) => term.aliases)
+    const aliases = terms.flatMap((term) => term.aliases.map(normalise))
     expect(new Set(aliases).size).toBe(aliases.length)
   })
 
@@ -41,8 +44,12 @@ describe('the shipped catalogues', () => {
     // A word can only mean one thing per descriptor. "kick" is an activity, so
     // no piece of equipment may also answer to it, or "50 kick" would parse two
     // ways depending on which catalogue happened to be consulted first.
-    const activityAliases = new Set(ACTIVITIES.flatMap((activity) => activity.aliases))
-    const modifierAliases = CATALOGUES.flatMap(([, terms]) => terms.flatMap((term) => term.aliases))
+    const activityAliases = new Set(
+      ACTIVITIES.flatMap((activity) => activity.aliases.map(normalise)),
+    )
+    const modifierAliases = CATALOGUES.flatMap(([, terms]) =>
+      terms.flatMap((term) => term.aliases.map(normalise)),
+    )
 
     expect(modifierAliases.filter((alias) => activityAliases.has(alias))).toEqual([])
   })

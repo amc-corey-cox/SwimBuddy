@@ -225,7 +225,7 @@ length, and never schedule two `intensity: hard` templates back to back.
 
 ```
 Swimmer   { id, name, birth_year, base_pace_by_stroke, load_factor, is_youth }
-Activity  { id, name, aliases, paced, stroke_group, mode, extent_kind: distance|time }
+Activity  { id, name, aliases, paced, stroke_group, mode, extent_kind: distance|time|either }
 Equipment { id, name, aliases, implies_mode }
 EffortBand{ id, name, aliases, rank }
 Pattern   { id, name, aliases, scopes }

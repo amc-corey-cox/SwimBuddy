@@ -23,7 +23,11 @@ describe('the shipped catalogue', () => {
   })
 
   it('never lets two entries claim the same alias', () => {
-    const aliases = ACTIVITIES.flatMap((activity) => activity.aliases)
+    // Normalised, because the matcher normalises: " Fins " and "fins" are one
+    // alias wearing two spellings, not two aliases.
+    const aliases = ACTIVITIES.flatMap((activity) =>
+      activity.aliases.map((alias) => alias.trim().toLowerCase()),
+    )
     expect(new Set(aliases).size).toBe(aliases.length)
   })
 })
