@@ -1,5 +1,7 @@
 import type { Settings, StoreSnapshot } from '../core/types'
 import { SCHEMA_VERSION } from '../core/types'
+import { ACTIVITIES } from '../core/activities'
+import { EFFORTS, EQUIPMENT, PATTERNS, STRUCTURES } from '../core/modifiers'
 import { FIXTURE_REFERENCE_DATE, daysBefore } from './constants'
 import { demoSwimmers } from './swimmers'
 import { demoTemplates } from './templates'
@@ -39,5 +41,12 @@ export function demoStore(referenceDate: number = FIXTURE_REFERENCE_DATE): Store
     sessions: demoSessions(referenceDate),
     test_sets: demoTestSets(referenceDate),
     settings: demoSettings(referenceDate),
+    // The shipped catalogues, not synthetic ones: a demo store that referred to
+    // activities nobody has would not exercise the thing it is standing in for.
+    activities: ACTIVITIES,
+    equipment: EQUIPMENT,
+    effort_bands: EFFORTS,
+    patterns: PATTERNS,
+    structures: STRUCTURES,
   }
 }

@@ -295,6 +295,23 @@ a coach mode. Keep the door open without building it:
 
 ## Safety
 
-The youth profile has hard caps: max session distance, max load factor, and mandatory
-rest intervals. Any change to adaptation rules must preserve those caps, and the tests
-must fail loudly if it doesn't.
+The youth profile has hard caps. Any change to the resolver or the adaptation rules must
+preserve them, and the tests must fail loudly if it doesn't.
+
+| Cap                  | Youth | Adult | Why                                                   |
+| -------------------- | ----- | ----- | ----------------------------------------------------- |
+| Max session distance | 1500  | none  | An 11-year-old fitness swimmer, not an age-grouper.   |
+| Max `load_factor`    | 1.15  | 1.4   | Already in the adaptation rules.                      |
+| Minimum rest         | 15s   | 5s    | Rest left after a realistic swim time for the extent. |
+
+Only the load factor was a number in the spec before the resolver was written. The other
+two were named but never defined, so the distance cap and the rest minimums above were
+chosen during implementation and **want the author's sign-off**. The reasoning: 1500 is
+comfortably under a typical age-group practice and matches "must not feel like a grind";
+15 seconds is enough that a youth swimmer is resting rather than chasing a send-off they
+cannot make. Both live in one place, `src/core/safety.ts`, so changing them is a
+one-line decision rather than a hunt.
+
+Distance caps apply to the resolved session. A template that would resolve past the cap
+has its repetition counts reduced first, and is truncated only if that is not enough —
+losing the end of a workout is better than handing a child one they should not swim.

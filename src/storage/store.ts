@@ -1,18 +1,24 @@
 import type { IDBPDatabase } from 'idb'
 import { SCHEMA_VERSION } from '../core/types'
 import type {
+  Activity,
+  EffortBand,
+  Equipment,
+  Pattern,
   RecordMeta,
+  Structure,
   Session,
   Settings,
   StoreSnapshot,
   Swimmer,
   Template,
+  Term,
   TestSet,
   Timestamp,
   Uuid,
 } from '../core/types'
 import { openDatabase, type OpenDatabaseOptions } from './db'
-import { SETTINGS_ID, type SwimBuddyDB } from './schema'
+import { SETTINGS_ID, type CatalogueStoreName, type SwimBuddyDB } from './schema'
 
 /** The fields a caller supplies; the store owns id, timestamps and the tombstone. */
 export type RecordInput<T extends RecordMeta> = Omit<T, keyof RecordMeta>
@@ -51,11 +57,34 @@ export interface TestSetCollection extends Collection<TestSet> {
   latestForSwimmer(this: void, swimmerId: Uuid): Promise<TestSet | undefined>
 }
 
+/**
+ * Reference data, addressed by its own semantic id.
+ *
+ * Deliberately not a `Collection`: that generates a UUID on create, and a
+ * catalogue id is the meaningful part — a parsed set refers to `free`, so the id
+ * comes from the entry rather than from the store. There is no create, only an
+ * upsert used by seeding and import, and a soft delete so a swimmer can hide a
+ * shipped row without it being dropped.
+ */
+export interface CatalogueCollection<T extends Term> {
+  list(this: void, options?: ReadOptions): Promise<T[]>
+  get(this: void, id: string, options?: ReadOptions): Promise<T | undefined>
+  /** Whole-record write, envelope included — see `Collection.put`. */
+  put(this: void, entry: T): Promise<T>
+  /** Soft delete, and the one write here where the store does stamp `updated_at`. */
+  remove(this: void, id: string): Promise<T>
+}
+
 export interface SwimBuddyStore {
   readonly swimmers: Collection<Swimmer>
   readonly templates: Collection<Template>
   readonly sessions: SessionCollection
   readonly testSets: TestSetCollection
+  readonly activities: CatalogueCollection<Activity>
+  readonly equipment: CatalogueCollection<Equipment>
+  readonly effortBands: CatalogueCollection<EffortBand>
+  readonly patterns: CatalogueCollection<Pattern>
+  readonly structures: CatalogueCollection<Structure>
   getSettings(): Promise<Settings>
   updateSettings(patch: RecordPatch<Settings>): Promise<Settings>
   /** The whole store, in the shape of the JSON export file (build order step 8). */
@@ -87,6 +116,39 @@ type RecordStoreName = 'swimmers' | 'templates' | 'sessions' | 'test_sets'
 function visible<T extends RecordMeta>(records: T[], options?: ReadOptions): T[] {
   if (options?.includeDeleted === true) return records
   return records.filter((record) => !record.deleted)
+}
+
+function createCatalogue<N extends CatalogueStoreName>(
+  database: IDBPDatabase<SwimBuddyDB>,
+  storeName: N,
+  deps: StoreDependencies,
+): CatalogueCollection<SwimBuddyDB[N]['value']> {
+  return {
+    async list(options) {
+      return visible(await database.getAll(storeName), options)
+    },
+
+    async get(id, options) {
+      const entry = await database.get(storeName, id)
+      if (!entry) return undefined
+      if (entry.deleted && options?.includeDeleted !== true) return undefined
+      return entry
+    },
+
+    async put(entry) {
+      await database.put(storeName, entry)
+      return entry
+    },
+
+    async remove(id) {
+      const existing = await database.get(storeName, id)
+      if (!existing) throw new Error(`No ${storeName} entry with id ${id}`)
+
+      const hidden = { ...existing, deleted: true, updated_at: deps.now() }
+      await database.put(storeName, hidden)
+      return hidden
+    },
+  }
 }
 
 function createCollection<N extends RecordStoreName>(
@@ -163,6 +225,12 @@ export async function openStore(options: OpenStoreOptions = {}): Promise<SwimBud
   const sessionBase = createCollection(database, 'sessions', deps)
   const testSetBase = createCollection(database, 'test_sets', deps)
 
+  const activities = createCatalogue(database, 'activities', deps)
+  const equipment = createCatalogue(database, 'equipment', deps)
+  const effortBands = createCatalogue(database, 'effort_bands', deps)
+  const patterns = createCatalogue(database, 'patterns', deps)
+  const structures = createCatalogue(database, 'structures', deps)
+
   const sessions: SessionCollection = {
     ...sessionBase,
     async forSwimmer(swimmerId, options) {
@@ -208,6 +276,11 @@ export async function openStore(options: OpenStoreOptions = {}): Promise<SwimBud
     templates,
     sessions,
     testSets,
+    activities,
+    equipment,
+    effortBands,
+    patterns,
+    structures,
     getSettings,
 
     async updateSettings(patch) {
@@ -218,12 +291,28 @@ export async function openStore(options: OpenStoreOptions = {}): Promise<SwimBud
     },
 
     async snapshot(options) {
-      const [swimmerRows, templateRows, sessionRows, testSetRows, settings] = await Promise.all([
+      const [
+        swimmerRows,
+        templateRows,
+        sessionRows,
+        testSetRows,
+        settings,
+        activityRows,
+        equipmentRows,
+        effortRows,
+        patternRows,
+        structureRows,
+      ] = await Promise.all([
         swimmers.list(options),
         templates.list(options),
         sessionBase.list(options),
         testSetBase.list(options),
         getSettings(),
+        activities.list(options),
+        equipment.list(options),
+        effortBands.list(options),
+        patterns.list(options),
+        structures.list(options),
       ])
 
       return {
@@ -233,6 +322,11 @@ export async function openStore(options: OpenStoreOptions = {}): Promise<SwimBud
         sessions: sessionRows,
         test_sets: testSetRows,
         settings,
+        activities: activityRows,
+        equipment: equipmentRows,
+        effort_bands: effortRows,
+        patterns: patternRows,
+        structures: structureRows,
       }
     },
 

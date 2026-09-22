@@ -37,6 +37,9 @@ export type {
   RecordMeta,
   RepRange,
   RepsSlot,
+  ResolvedSection,
+  ResolvedSet,
+  ResolvedWorkout,
   Session,
   SetLine,
   SetPart,
@@ -85,5 +88,5 @@ export const STROKE_OFFSETS: Readonly<Record<Exclude<StrokeGroup, 'free'>, numbe
   fly: 12,
 }
 
-/** Bumped whenever a migration is added. */
-export const SCHEMA_VERSION = 1
+/** Bumped whenever a migration is added. Kept in step with `DATABASE_VERSION`. */
+export const SCHEMA_VERSION = 2

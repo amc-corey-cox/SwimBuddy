@@ -205,10 +205,56 @@ export interface ParsedSection {
 
 
 /**
+ * One set with every number decided.
+ */
+export interface ResolvedSet {
+    readonly reps: number,
+    readonly parts: readonly [SetPart, ...SetPart[]],
+    /** When to leave, in seconds. Absent when the set prescribes no interval, or when it asked for one relative to a base pace the activity does not have. */
+    readonly send_off_seconds?: number,
+    /** How fast to swim it, in seconds. Distinct from the send-off. */
+    readonly pace_seconds?: number,
+    readonly pattern?: AppliedPattern,
+    readonly structure?: string,
+    readonly note?: string,
+    /** The line as the template author wrote it, kept for display. */
+    readonly raw: string,
+}
+
+
+/**
+ * A named block of a resolved workout.
+ */
+export interface ResolvedSection {
+    readonly name: string,
+    readonly sets: readonly ResolvedSet[],
+}
+
+
+/**
+ * A template resolved for one swimmer. Not a stored record on its own — a Session keeps the sections once the workout has been swum.
+ */
+export interface ResolvedWorkout {
+    readonly swimmer_id: string,
+    readonly template_id: string,
+    readonly sections: readonly ResolvedSection[],
+    /** Includes the easy-swim equivalent of any time-measured set, so one number stays comparable week to week. */
+    readonly total_distance: number,
+    /** True when a safety cap changed the workout — youth session distance is the only one that can today. Worth surfacing rather than silently shrinking a session someone asked for. */
+    readonly capped: boolean,
+}
+
+
+/**
  * What every catalogue entry has in common: a stable id, a display name, and the words a template author might actually write for it.
+ * Catalogue entries carry the same sync envelope as every other record, because once seeded that is what they are. Their id is semantic rather than a UUID — a parsed set refers to `free` and `back_float`, and those references have to survive an export and an import on another phone.
  */
 export interface Term {
     readonly id: string,
+    readonly created_at: number,
+    readonly updated_at: number,
+    /** Lets a swimmer hide a shipped entry without it being dropped. */
+    readonly deleted: boolean,
     readonly name: string,
     /** The words a template author might write for it. Matched normalised, so case and stray whitespace in a row a swimmer added do not stop it matching. */
     readonly aliases: readonly [string, ...string[]],
@@ -327,8 +373,8 @@ export interface Session extends RecordMeta {
     readonly swimmer_id: string,
     readonly template_id: string,
     readonly date: number,
-    /** Filled by the resolver in step 5; absent until then. */
-    readonly resolved_sets?: readonly ParsedSection[],
+    /** What was actually swum, with every number decided. */
+    readonly resolved_sets?: readonly ResolvedSection[],
     /** Includes the easy-swim equivalent of any time-measured sets, so one number stays comparable week to week. */
     readonly total_distance: number,
     /** Absent until the swimmer rates the session. */
@@ -374,4 +420,9 @@ export interface StoreSnapshot {
     readonly sessions: readonly Session[],
     readonly test_sets: readonly TestSet[],
     readonly settings: Settings,
+    readonly activities: readonly Activity[],
+    readonly equipment: readonly Equipment[],
+    readonly effort_bands: readonly EffortBand[],
+    readonly patterns: readonly Pattern[],
+    readonly structures: readonly Structure[],
 }

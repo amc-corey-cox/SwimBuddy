@@ -1,3 +1,4 @@
+import { shipped } from './catalogue'
 import { byAliasLength, matchTerm, matchTerms } from './terms'
 import type { AppliedPattern, EffortBand, Equipment, Pattern, RepRange, Structure } from './types'
 
@@ -15,17 +16,17 @@ import type { AppliedPattern, EffortBand, Equipment, Pattern, RepRange, Structur
  */
 
 export const EQUIPMENT: readonly Equipment[] = [
-  {
+  shipped({
     id: 'board',
     name: 'Kickboard',
     aliases: ['kickboard', 'kick board', 'board'],
     implies_mode: 'kick',
-  },
-  { id: 'buoy', name: 'Pull buoy', aliases: ['pull buoy', 'buoy'], implies_mode: 'pull' },
-  { id: 'fins', name: 'Fins', aliases: ['fins', 'flippers'] },
-  { id: 'paddles', name: 'Paddles', aliases: ['hand paddles', 'paddles'] },
-  { id: 'snorkel', name: 'Snorkel', aliases: ['snorkel'] },
-  { id: 'band', name: 'Ankle band', aliases: ['ankle band', 'band'] },
+  }),
+  shipped({ id: 'buoy', name: 'Pull buoy', aliases: ['pull buoy', 'buoy'], implies_mode: 'pull' }),
+  shipped({ id: 'fins', name: 'Fins', aliases: ['fins', 'flippers'] }),
+  shipped({ id: 'paddles', name: 'Paddles', aliases: ['hand paddles', 'paddles'] }),
+  shipped({ id: 'snorkel', name: 'Snorkel', aliases: ['snorkel'] }),
+  shipped({ id: 'band', name: 'Ankle band', aliases: ['ankle band', 'band'] }),
 ]
 
 /**
@@ -33,14 +34,19 @@ export const EQUIPMENT: readonly Equipment[] = [
  * sets is harder without parsing English; it is not a pace and never becomes one.
  */
 export const EFFORTS: readonly EffortBand[] = [
-  { id: 'recovery', name: 'Recovery', aliases: ['recovery', 'recover'], rank: 1 },
-  { id: 'easy', name: 'Easy', aliases: ['easy'], rank: 2 },
-  { id: 'steady', name: 'Steady', aliases: ['steady', 'aerobic', 'moderate'], rank: 3 },
-  { id: 'strong', name: 'Strong', aliases: ['strong'], rank: 4 },
-  { id: 'threshold', name: 'Threshold', aliases: ['threshold', 'tempo'], rank: 5 },
-  { id: 'hard', name: 'Hard', aliases: ['hard', 'fast'], rank: 6 },
-  { id: 'race_pace', name: 'Race pace', aliases: ['race pace', 'race'], rank: 7 },
-  { id: 'sprint', name: 'Sprint', aliases: ['sprint', 'all out', 'all-out', 'max'], rank: 8 },
+  shipped({ id: 'recovery', name: 'Recovery', aliases: ['recovery', 'recover'], rank: 1 }),
+  shipped({ id: 'easy', name: 'Easy', aliases: ['easy'], rank: 2 }),
+  shipped({ id: 'steady', name: 'Steady', aliases: ['steady', 'aerobic', 'moderate'], rank: 3 }),
+  shipped({ id: 'strong', name: 'Strong', aliases: ['strong'], rank: 4 }),
+  shipped({ id: 'threshold', name: 'Threshold', aliases: ['threshold', 'tempo'], rank: 5 }),
+  shipped({ id: 'hard', name: 'Hard', aliases: ['hard', 'fast'], rank: 6 }),
+  shipped({ id: 'race_pace', name: 'Race pace', aliases: ['race pace', 'race'], rank: 7 }),
+  shipped({
+    id: 'sprint',
+    name: 'Sprint',
+    aliases: ['sprint', 'all out', 'all-out', 'max'],
+    rank: 8,
+  }),
 ]
 
 /**
@@ -52,25 +58,30 @@ export const EFFORTS: readonly EffortBand[] = [
  * repetitions; a negative split only ever happens within one swim.
  */
 export const PATTERNS: readonly Pattern[] = [
-  { id: 'build', name: 'Build', aliases: ['build'], scopes: ['within_rep', 'across_set'] },
-  { id: 'descend', name: 'Descend', aliases: ['descend'], scopes: ['across_set'] },
-  { id: 'ascend', name: 'Ascend', aliases: ['ascend'], scopes: ['across_set'] },
-  { id: 'alternate', name: 'Alternate', aliases: ['alternate'], scopes: ['across_set'] },
-  { id: 'ladder', name: 'Ladder', aliases: ['ladder'], scopes: ['across_set'] },
-  { id: 'pyramid', name: 'Pyramid', aliases: ['pyramid'], scopes: ['across_set'] },
-  {
+  shipped({ id: 'build', name: 'Build', aliases: ['build'], scopes: ['within_rep', 'across_set'] }),
+  shipped({ id: 'descend', name: 'Descend', aliases: ['descend'], scopes: ['across_set'] }),
+  shipped({ id: 'ascend', name: 'Ascend', aliases: ['ascend'], scopes: ['across_set'] }),
+  shipped({ id: 'alternate', name: 'Alternate', aliases: ['alternate'], scopes: ['across_set'] }),
+  shipped({ id: 'ladder', name: 'Ladder', aliases: ['ladder'], scopes: ['across_set'] }),
+  shipped({ id: 'pyramid', name: 'Pyramid', aliases: ['pyramid'], scopes: ['across_set'] }),
+  shipped({
     id: 'negative_split',
     name: 'Negative split',
     aliases: ['negative split', 'neg split'],
     scopes: ['within_rep'],
-  },
-  { id: 'broken', name: 'Broken', aliases: ['broken'], scopes: ['within_rep'] },
+  }),
+  shipped({ id: 'broken', name: 'Broken', aliases: ['broken'], scopes: ['within_rep'] }),
 ]
 
 export const STRUCTURES: readonly Structure[] = [
-  { id: 'relay', name: 'Relay', aliases: ['relay'], min_swimmers: 2 },
-  { id: 'partner', name: 'Partner', aliases: ['partner'], min_swimmers: 2 },
-  { id: 'pace_line', name: 'Pace line', aliases: ['pace line', 'paceline'], min_swimmers: 2 },
+  shipped({ id: 'relay', name: 'Relay', aliases: ['relay'], min_swimmers: 2 }),
+  shipped({ id: 'partner', name: 'Partner', aliases: ['partner'], min_swimmers: 2 }),
+  shipped({
+    id: 'pace_line',
+    name: 'Pace line',
+    aliases: ['pace line', 'paceline'],
+    min_swimmers: 2,
+  }),
 ]
 
 const EQUIPMENT_ALIASES = byAliasLength(EQUIPMENT)

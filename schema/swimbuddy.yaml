@@ -352,6 +352,90 @@ classes:
           - range: MetaLine
           - range: UnparsedLine
 
+  # --- A resolved workout ------------------------------------------------
+  #
+  # What the parse tree becomes once a swimmer is applied to it: repetition slots
+  # picked, send-offs in seconds rather than relative to a base pace, and a total
+  # distance. Parts are the same shape as a parsed set's, because resolving does
+  # not change what is being swum, only how much and how often.
+
+  ResolvedSet:
+    description: One set with every number decided.
+    attributes:
+      reps:
+        range: integer
+        required: true
+        minimum_value: 1
+      parts:
+        range: SetPart
+        required: true
+        multivalued: true
+        inlined_as_list: true
+        minimum_cardinality: 1
+      send_off_seconds:
+        range: integer
+        minimum_value: 1
+        description: >-
+          When to leave, in seconds. Absent when the set prescribes no interval, or
+          when it asked for one relative to a base pace the activity does not have.
+      pace_seconds:
+        range: integer
+        minimum_value: 1
+        description: How fast to swim it, in seconds. Distinct from the send-off.
+      pattern:
+        range: AppliedPattern
+        inlined: true
+      structure:
+        range: string
+      note:
+        range: string
+      raw:
+        range: string
+        required: true
+        description: The line as the template author wrote it, kept for display.
+
+  ResolvedSection:
+    description: A named block of a resolved workout.
+    attributes:
+      name:
+        range: string
+        required: true
+      sets:
+        range: ResolvedSet
+        required: true
+        multivalued: true
+        inlined_as_list: true
+
+  ResolvedWorkout:
+    description: >-
+      A template resolved for one swimmer. Not a stored record on its own — a
+      Session keeps the sections once the workout has been swum.
+    attributes:
+      swimmer_id:
+        range: Uuid
+        required: true
+      template_id:
+        range: Uuid
+        required: true
+      sections:
+        range: ResolvedSection
+        required: true
+        multivalued: true
+        inlined_as_list: true
+      total_distance:
+        range: integer
+        required: true
+        description: >-
+          Includes the easy-swim equivalent of any time-measured set, so one number
+          stays comparable week to week.
+      capped:
+        range: boolean
+        required: true
+        description: >-
+          True when a safety cap changed the workout — youth session distance is the
+          only one that can today. Worth surfacing rather than silently shrinking a
+          session someone asked for.
+
   # --- The catalogues -------------------------------------------------------
   #
   # Activities, equipment, effort bands, patterns and structures are data rather
@@ -363,11 +447,26 @@ classes:
     description: >-
       What every catalogue entry has in common: a stable id, a display name, and the
       words a template author might actually write for it.
+
+      Catalogue entries carry the same sync envelope as every other record, because
+      once seeded that is what they are. Their id is semantic rather than a UUID —
+      a parsed set refers to `free` and `back_float`, and those references have to
+      survive an export and an import on another phone.
     attributes:
       id:
         identifier: true
         range: string
         required: true
+      created_at:
+        range: Timestamp
+        required: true
+      updated_at:
+        range: Timestamp
+        required: true
+      deleted:
+        range: boolean
+        required: true
+        description: Lets a swimmer hide a shipped entry without it being dropped.
       name:
         range: string
         required: true
@@ -562,10 +661,10 @@ classes:
         range: Timestamp
         required: true
       resolved_sets:
-        range: ParsedSection
+        range: ResolvedSection
         multivalued: true
         inlined_as_list: true
-        description: Filled by the resolver in step 5; absent until then.
+        description: What was actually swum, with every number decided.
       total_distance:
         range: integer
         required: true
@@ -659,3 +758,28 @@ classes:
         range: Settings
         required: true
         inlined: true
+      activities:
+        range: Activity
+        required: true
+        multivalued: true
+        inlined_as_list: true
+      equipment:
+        range: Equipment
+        required: true
+        multivalued: true
+        inlined_as_list: true
+      effort_bands:
+        range: EffortBand
+        required: true
+        multivalued: true
+        inlined_as_list: true
+      patterns:
+        range: Pattern
+        required: true
+        multivalued: true
+        inlined_as_list: true
+      structures:
+        range: Structure
+        required: true
+        multivalued: true
+        inlined_as_list: true
