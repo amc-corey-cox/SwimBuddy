@@ -47,6 +47,32 @@ describe('the synthetic store', () => {
   })
 })
 
+/** A store whose one parsed set carries the given distance. */
+function storeWithDistance(value: number): unknown {
+  const store = demoStore()
+  return {
+    ...store,
+    templates: [
+      {
+        ...store.templates[0],
+        parsed_sets: [
+          {
+            name: 'main',
+            lines: [
+              {
+                kind: 'set',
+                reps: 1,
+                raw: `${String(value)} free`,
+                parts: [{ extent: { kind: 'distance', value }, descriptor: 'free' }],
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  }
+}
+
 describe('the schema rejects what the types cannot', () => {
   it('rejects a distance that is not positive', () => {
     const store = demoStore()
@@ -113,6 +139,27 @@ describe('the schema rejects what the types cannot', () => {
     if (first === undefined) throw new Error('fixtures have no swimmers')
 
     expect(errors({ ...store, swimmers: [{ ...first, load_factor: 2.5 }] })).not.toEqual([])
+  })
+
+  it('rejects a distance that is not a whole pool length', () => {
+    // The spec's distances rule. LinkML has no way to say "a multiple of 25", so
+    // without the generator applying it a 37 would validate against a schema that
+    // the TypeScript model and the resolver both consider impossible.
+    expect(errors(storeWithDistance(37))).not.toEqual([])
+    expect(errors(storeWithDistance(100))).toEqual([])
+  })
+
+  it('rejects an explicit null where the model means absent', () => {
+    // The two artifacts are generated from one schema and have to agree: the
+    // TypeScript uses absence under exactOptionalPropertyTypes, so a JSON Schema
+    // that accepted null would validate a file the model cannot hold.
+    const store = demoStore()
+    const withNull = {
+      ...store,
+      sessions: [{ ...store.sessions[0], notes: null }],
+    }
+
+    expect(errors(withNull)).not.toEqual([])
   })
 
   it('rejects an unknown field, because the export file is a closed shape', () => {
