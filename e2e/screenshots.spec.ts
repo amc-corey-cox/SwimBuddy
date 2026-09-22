@@ -8,7 +8,7 @@ import { test } from '@playwright/test'
  */
 test('capture home screen', async ({ page }, testInfo) => {
   await page.goto('/SwimBuddy/')
-  await page.getByTestId('demo-panel').waitFor()
+  await page.getByTestId('screen-home').waitFor()
 
   await page.screenshot({
     path: `screenshots/${testInfo.project.name}-home.png`,

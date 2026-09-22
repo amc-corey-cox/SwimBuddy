@@ -5,51 +5,43 @@ const SOURCE_URL = 'https://github.com/amc-corey-cox/SwimBuddy'
 const app = document.querySelector<HTMLDivElement>('#app')
 if (!app) throw new Error('#app mount point is missing')
 
-const heading = document.createElement('h1')
-heading.textContent = 'Swim Buddy'
-app.append(heading)
-
-const tagline = document.createElement('p')
-tagline.className = 'tagline'
-tagline.textContent = 'Scaffold only — screens land in later steps.'
-app.append(tagline)
-
-// Open the real store and seed the household on first run. Rendered as a status
-// line because it is the only way to confirm IndexedDB actually works in a
-// browser — unit tests run against fake-indexeddb, and the e2e suite's
-// no-console-errors assertion covers the rest. Scaffolding until step 6.
-const storageStatus = document.createElement('p')
-storageStatus.className = 'muted'
-storageStatus.dataset['testid'] = 'storage-status'
-storageStatus.textContent = 'Opening local database…'
-app.append(storageStatus)
+const status = document.createElement('p')
+status.className = 'muted'
+status.dataset['testid'] = 'storage-status'
+status.textContent = 'Opening local database…'
+app.append(status)
 
 void (async () => {
   try {
-    const { openStore, seedIfEmpty } = await import('./storage/index')
+    const [{ openStore, seedIfEmpty }, { startApp }] = await Promise.all([
+      import('./storage/index'),
+      import('./ui/app'),
+    ])
+
     const store = await openStore()
     await seedIfEmpty(store)
-    const swimmers = await store.swimmers.list()
-    storageStatus.textContent = `${String(swimmers.length)} swimmers stored locally`
+
+    status.remove()
+    await startApp({ store, mount: app })
   } catch (error) {
-    storageStatus.textContent = `Local database unavailable: ${
+    // The whole app is local-first, so a database that will not open is the one
+    // failure there is no working around. Say so plainly rather than showing an
+    // empty screen.
+    status.textContent = `Local database unavailable: ${
       error instanceof Error ? error.message : String(error)
     }`
   }
 })()
 
-// Preview builds seed the page from the synthetic store so a PR preview shows a
-// populated app. The flag is statically replaced at build time, so production
-// builds drop both imports entirely.
-if (import.meta.env.VITE_SHOW_FIXTURES === 'true') {
-  void (async () => {
-    const [{ demoStore }, { renderDemoPanel }] = await Promise.all([
-      import('./fixtures/index'),
-      import('./ui/demoPanel'),
-    ])
-    const now = Date.now()
-    app.append(renderDemoPanel(demoStore(now), now))
-  })()
+// Offline is the default, not a feature: the pool has no signal. Registration is
+// best effort — a browser without service workers still gets a working app, it
+// just needs to have been online recently.
+if ('serviceWorker' in navigator && import.meta.env.PROD) {
+  window.addEventListener('load', () => {
+    void navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`).catch(() => {
+      // Unsupported, blocked, or served from a context that forbids it.
+    })
+  })
 }
 
 // AGPL section 13: every page links back to the source.
@@ -59,6 +51,6 @@ const sourceLink = document.createElement('a')
 sourceLink.href = SOURCE_URL
 sourceLink.rel = 'noopener'
 sourceLink.dataset['testid'] = 'source-link'
-sourceLink.textContent = 'Source code (AGPLv3)'
+sourceLink.textContent = 'Source'
 footer.append(sourceLink)
 document.body.append(footer)

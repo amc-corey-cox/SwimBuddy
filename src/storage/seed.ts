@@ -1,6 +1,7 @@
 import type { Swimmer, Term, Timestamp } from '../core/types'
 import { ACTIVITIES } from '../core/activities'
 import { EFFORTS, EQUIPMENT, PATTERNS, STRUCTURES } from '../core/modifiers'
+import { SHIPPED_TEMPLATES } from '../core/templates'
 import type { CatalogueCollection, RecordInput, SwimBuddyStore } from './store'
 
 /**
@@ -33,6 +34,8 @@ export interface SeedResult {
   readonly swimmers: readonly Swimmer[]
   /** How many catalogue entries were written. Zero once they are already there. */
   readonly catalogue_entries: number
+  /** How many workout arrangements were written. Zero once they are already there. */
+  readonly templates: number
 }
 
 export interface SeedOptions {
@@ -57,6 +60,7 @@ export async function seedIfEmpty(
   // an upgrade that adds a row should reach a store someone is already using —
   // whereas re-seeding swimmers into a store someone emptied would undo a decision.
   const catalogueEntries = await seedCatalogues(store)
+  const templates = await seedTemplates(store)
 
   const existing = await store.swimmers.list({ includeDeleted: true })
   if (existing.length > 0) {
@@ -64,6 +68,7 @@ export async function seedIfEmpty(
       seeded: false,
       swimmers: existing.filter((swimmer) => !swimmer.deleted),
       catalogue_entries: catalogueEntries,
+      templates,
     }
   }
 
@@ -85,7 +90,7 @@ export async function seedIfEmpty(
   // Persist the default settings row so the store is complete after seeding.
   await store.updateSettings({})
 
-  return { seeded: true, swimmers: created, catalogue_entries: catalogueEntries }
+  return { seeded: true, swimmers: created, catalogue_entries: catalogueEntries, templates }
 }
 
 /**
@@ -103,6 +108,27 @@ async function seedCatalogues(store: SwimBuddyStore): Promise<number> {
   written += await seedCatalogue(store.effortBands, EFFORTS)
   written += await seedCatalogue(store.patterns, PATTERNS)
   written += await seedCatalogue(store.structures, STRUCTURES)
+  return written
+}
+
+/**
+ * Writes any shipped arrangement the store does not already hold.
+ *
+ * Same rules as the catalogues, and for the same reason: an arrangement someone
+ * edited is theirs, and one they deleted was a decision.
+ */
+async function seedTemplates(store: SwimBuddyStore): Promise<number> {
+  const held = new Set(
+    (await store.templates.list({ includeDeleted: true })).map((template) => template.id),
+  )
+
+  let written = 0
+  for (const template of SHIPPED_TEMPLATES) {
+    if (held.has(template.id)) continue
+    await store.templates.put(template)
+    written += 1
+  }
+
   return written
 }
 

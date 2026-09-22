@@ -49,7 +49,7 @@ export default tseslint.config(
 
   // Build tooling: Node globals, typechecked against the node project.
   {
-    files: ['vite.config.ts', 'playwright.config.ts'],
+    files: ['vite.config.ts', 'playwright.config.ts', 'scripts/service-worker-plugin.ts'],
     languageOptions: {
       globals: globals.node,
       parserOptions: {

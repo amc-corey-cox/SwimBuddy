@@ -41,6 +41,13 @@ export interface Collection<T extends RecordMeta> {
   list(this: void, options?: ReadOptions): Promise<T[]>
   get(this: void, id: Uuid, options?: ReadOptions): Promise<T | undefined>
   create(this: void, input: RecordInput<T>): Promise<T>
+  /**
+   * Writes a record whole, keeping the id it already has.
+   *
+   * For seeding and import, where the id is part of the data rather than
+   * something the store gets to choose. `create` is what user actions use.
+   */
+  put(this: void, entry: T): Promise<T>
   update(this: void, id: Uuid, patch: RecordPatch<T>): Promise<T>
   /** Soft delete: the row stays, flagged, so a future sync can propagate it. */
   remove(this: void, id: Uuid): Promise<T>
@@ -172,6 +179,11 @@ function createCollection<N extends RecordStoreName>(
       if (!record) return undefined
       if (record.deleted && options?.includeDeleted !== true) return undefined
       return record
+    },
+
+    async put(entry) {
+      await database.put(storeName, entry)
+      return entry
     },
 
     async create(input) {
