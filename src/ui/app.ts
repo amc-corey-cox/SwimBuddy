@@ -5,6 +5,7 @@ import { preSwimScreen } from './screens/preSwim'
 import { workoutScreen } from './screens/workout'
 import { postSwimScreen, type PostSwimAnswers } from './screens/postSwim'
 import { keepScreenAwake, type WakeLock } from './wakeLock'
+import { adapt, type Adaptation } from '../core/adaptation'
 import { resolveTemplate } from '../core/resolver'
 import { selectTemplate, type Selection } from '../core/selection'
 import type { ResolvedWorkout, Settings, Swimmer, Template } from '../core/types'
@@ -63,15 +64,25 @@ export async function startApp(options: AppOptions): Promise<void> {
     wakeLock = undefined
   }
 
-  async function chooseFor(swimmer: Swimmer, minutes: number): Promise<Selection | undefined> {
-    const recentSessions = await store.sessions.forSwimmer(swimmer.id)
-    return selectTemplate({
-      swimmer,
+  async function planFor(
+    swimmer: Swimmer,
+    minutes: number,
+  ): Promise<{ selection: Selection | undefined; adaptation: Adaptation }> {
+    const stored = await store.sessions.forSwimmer(swimmer.id)
+    const recentSessions = [...stored].sort((a, b) => b.date - a.date)
+    const adaptation = adapt(swimmer, recentSessions, now())
+
+    const selection = selectTemplate({
+      // Selection sees the adapted swimmer, not the stored one: how much work
+      // they are up for today is what decides which template fits the time.
+      swimmer: { ...swimmer, load_factor: adaptation.load_factor },
       templates,
-      recentSessions: [...recentSessions].sort((a, b) => b.date - a.date),
+      recentSessions,
       requestedMinutes: minutes,
       now: now(),
     })
+
+    return { selection, adaptation }
   }
 
   function go(next: Screen): void {
@@ -94,10 +105,10 @@ export async function startApp(options: AppOptions): Promise<void> {
 
     if (screen.name === 'pre-swim') {
       const { swimmer, minutes } = screen
-      const selection = await chooseFor(swimmer, minutes)
+      const { selection, adaptation } = await planFor(swimmer, minutes)
 
       mount.append(
-        preSwimScreen(swimmer, minutes, selection, {
+        preSwimScreen(swimmer, minutes, selection, adaptation.reasons, {
           onLengthChange: (next) => {
             go({ name: 'pre-swim', swimmer, minutes: next })
           },
@@ -109,7 +120,13 @@ export async function startApp(options: AppOptions): Promise<void> {
             go({
               name: 'workout',
               swimmer,
-              workout: resolveTemplate(selection.template, swimmer),
+              workout: resolveTemplate(selection.template, swimmer, {
+                loadFactor: adaptation.load_factor,
+                sendOffBonusSeconds: adaptation.send_off_bonus_seconds,
+                ...(adaptation.weekly_distance_budget === null
+                  ? {}
+                  : { maxDistance: adaptation.weekly_distance_budget }),
+              }),
               index: 0,
             })
           },
@@ -164,6 +181,22 @@ export async function startApp(options: AppOptions): Promise<void> {
       ...(answers.fun === undefined ? {} : { fun_rating: answers.fun }),
       notes: '',
     })
+
+    // The rating only means something if it reaches the next swim. Recomputing
+    // from the freshly written history, rather than from what was on screen,
+    // keeps the stored load factor a function of what actually happened.
+    const history = await store.sessions.forSwimmer(swimmer.id)
+    const next = adapt(
+      swimmer,
+      [...history].sort((a, b) => b.date - a.date),
+      now(),
+    )
+
+    if (next.load_factor !== swimmer.load_factor) {
+      const updated = await store.swimmers.update(swimmer.id, { load_factor: next.load_factor })
+      const index = swimmers.findIndex((each) => each.id === swimmer.id)
+      if (index >= 0) swimmers[index] = updated
+    }
   }
 
   await render()

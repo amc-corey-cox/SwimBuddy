@@ -132,3 +132,24 @@ test('it is installable', async ({ page }) => {
   expect(manifest.display).toBe('standalone')
   expect(manifest.icons.length).toBeGreaterThanOrEqual(2)
 })
+
+test('a rating changes the next swim', async ({ page }) => {
+  // The loop's whole point: saying it was too hard has to reach the next session.
+  await page.goto('/SwimBuddy/')
+  await page.getByTestId('screen-home').getByRole('button').first().click()
+  await expect(page.getByTestId('reasons')).toBeVisible()
+  await expect(page.getByTestId('reasons')).not.toContainText('Last swim was too hard')
+
+  await page.getByTestId('start').click()
+  for (let guard = 0; guard < 50; guard += 1) {
+    if ((await page.getByTestId('finish').count()) > 0) break
+    await page.getByTestId('next').click()
+  }
+  await page.getByTestId('finish').click()
+  await page.getByTestId('effort-too_hard').click()
+
+  await expect(page.getByTestId('screen-home')).toBeVisible()
+  await page.getByTestId('screen-home').getByRole('button').first().click()
+
+  await expect(page.getByTestId('reasons')).toContainText('Last swim was too hard')
+})

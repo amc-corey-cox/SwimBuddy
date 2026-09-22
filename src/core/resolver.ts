@@ -44,6 +44,16 @@ export interface ResolveOptions {
    * new one before a session; this is how it reaches the resolver without a write.
    */
   readonly loadFactor?: number
+  /**
+   * Added to every resolved send-off. The adaptation rules grant this after two
+   * hard sessions running, so it is relief rather than a preference.
+   */
+  readonly sendOffBonusSeconds?: number
+  /**
+   * A distance ceiling on top of the swimmer's own cap, from the weekly growth
+   * rule. Trimmed to the same way and reported the same way.
+   */
+  readonly maxDistance?: number
 }
 
 export function resolveTemplate(
@@ -54,15 +64,24 @@ export function resolveTemplate(
   const caps = capsFor(swimmer)
   const loadFactor = clampLoadFactor(options.loadFactor ?? swimmer.load_factor, caps)
 
+  const bonus = options.sendOffBonusSeconds ?? 0
+
   const sections = parseTemplate(template.raw_text).sections.map((section) => ({
     name: section.name,
     sets: section.lines
       .filter((line): line is SetLine => line.kind === 'set')
-      .map((line) => resolveSet(line, swimmer, loadFactor, caps)),
+      .map((line) => resolveSet(line, swimmer, loadFactor, caps, bonus)),
   }))
 
+  // The weekly growth rule and the youth cap are the same kind of limit, so the
+  // tighter of the two is simply the limit.
+  const limits = [caps.max_session_distance, options.maxDistance].filter(
+    (limit): limit is number => limit !== undefined && limit !== null,
+  )
+  const limit = limits.length > 0 ? Math.min(...limits) : null
+
   const withSets = sections.filter((section) => section.sets.length > 0)
-  const capped = applyDistanceCap(withSets, swimmer, caps)
+  const capped = applyDistanceCap(withSets, swimmer, limit)
 
   return {
     swimmer_id: swimmer.id,
@@ -78,11 +97,13 @@ function resolveSet(
   swimmer: Swimmer,
   loadFactor: number,
   caps: SafetyCaps,
+  sendOffBonusSeconds: number,
 ): ResolvedSet {
   const reps = resolveReps(line.reps, loadFactor)
-  const sendOff = line.interval
+  const authored = line.interval
     ? resolveInterval(line.interval, line.parts, swimmer, caps)
     : undefined
+  const sendOff = authored === undefined ? undefined : authored + sendOffBonusSeconds
   const pace = line.pace ? resolveInterval(line.pace, line.parts, swimmer, undefined) : undefined
 
   return {
@@ -219,7 +240,7 @@ interface CappedSections {
 function applyDistanceCap(
   sections: readonly ResolvedSection[],
   swimmer: Swimmer,
-  caps: SafetyCaps,
+  limit: number | null,
 ): CappedSections {
   const total = (current: readonly ResolvedSection[]): number =>
     current.reduce(
@@ -228,7 +249,6 @@ function applyDistanceCap(
       0,
     )
 
-  const limit = caps.max_session_distance
   if (limit === null || total(sections) <= limit) {
     return { sections, total_distance: total(sections), capped: false }
   }
