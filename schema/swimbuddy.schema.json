@@ -12,6 +12,13 @@
           "minItems": 1,
           "type": "array"
         },
+        "created_at": {
+          "type": "integer"
+        },
+        "deleted": {
+          "description": "Lets a swimmer hide a shipped entry without it being dropped.",
+          "type": "boolean"
+        },
         "extent_kind": {
           "$ref": "#/$defs/ActivityExtentKind"
         },
@@ -31,12 +38,18 @@
         "stroke_group": {
           "$ref": "#/$defs/StrokeGroup",
           "description": "Only ever set on a paced activity; an unpaced one has no base pace to look up."
+        },
+        "updated_at": {
+          "type": "integer"
         }
       },
       "required": [
         "paced",
         "extent_kind",
         "id",
+        "created_at",
+        "updated_at",
+        "deleted",
         "name",
         "aliases"
       ],
@@ -203,6 +216,13 @@
           "minItems": 1,
           "type": "array"
         },
+        "created_at": {
+          "type": "integer"
+        },
+        "deleted": {
+          "description": "Lets a swimmer hide a shipped entry without it being dropped.",
+          "type": "boolean"
+        },
         "id": {
           "type": "string"
         },
@@ -213,11 +233,17 @@
           "description": "Ordering from easiest to hardest, so a selection rule can ask which of two sets is harder without parsing English. An ordering, never a pace — the gap between two ranks means nothing.",
           "minimum": 1,
           "type": "integer"
+        },
+        "updated_at": {
+          "type": "integer"
         }
       },
       "required": [
         "rank",
         "id",
+        "created_at",
+        "updated_at",
+        "deleted",
         "name",
         "aliases"
       ],
@@ -246,6 +272,13 @@
           "minItems": 1,
           "type": "array"
         },
+        "created_at": {
+          "type": "integer"
+        },
+        "deleted": {
+          "description": "Lets a swimmer hide a shipped entry without it being dropped.",
+          "type": "boolean"
+        },
         "id": {
           "type": "string"
         },
@@ -255,10 +288,16 @@
         },
         "name": {
           "type": "string"
+        },
+        "updated_at": {
+          "type": "integer"
         }
       },
       "required": [
         "id",
+        "created_at",
+        "updated_at",
+        "deleted",
         "name",
         "aliases"
       ],
@@ -417,6 +456,13 @@
           "minItems": 1,
           "type": "array"
         },
+        "created_at": {
+          "type": "integer"
+        },
+        "deleted": {
+          "description": "Lets a swimmer hide a shipped entry without it being dropped.",
+          "type": "boolean"
+        },
         "id": {
           "type": "string"
         },
@@ -430,11 +476,17 @@
           },
           "minItems": 1,
           "type": "array"
+        },
+        "updated_at": {
+          "type": "integer"
         }
       },
       "required": [
         "scopes",
         "id",
+        "created_at",
+        "updated_at",
+        "deleted",
         "name",
         "aliases"
       ],
@@ -525,6 +577,128 @@
       "title": "RepsSlot",
       "type": "object"
     },
+    "ResolvedSection": {
+      "additionalProperties": false,
+      "description": "A named block of a resolved workout.",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "sets": {
+          "items": {
+            "$ref": "#/$defs/ResolvedSet"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "name",
+        "sets"
+      ],
+      "title": "ResolvedSection",
+      "type": "object"
+    },
+    "ResolvedSet": {
+      "additionalProperties": false,
+      "description": "One set with every number decided.",
+      "properties": {
+        "note": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "pace_seconds": {
+          "description": "How fast to swim it, in seconds. Distinct from the send-off.",
+          "minimum": 1,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "parts": {
+          "items": {
+            "$ref": "#/$defs/SetPart"
+          },
+          "minItems": 1,
+          "type": "array"
+        },
+        "pattern": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AppliedPattern"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "raw": {
+          "description": "The line as the template author wrote it, kept for display.",
+          "type": "string"
+        },
+        "reps": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "send_off_seconds": {
+          "description": "When to leave, in seconds. Absent when the set prescribes no interval, or when it asked for one relative to a base pace the activity does not have.",
+          "minimum": 1,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "structure": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "reps",
+        "parts",
+        "raw"
+      ],
+      "title": "ResolvedSet",
+      "type": "object"
+    },
+    "ResolvedWorkout": {
+      "additionalProperties": false,
+      "description": "A template resolved for one swimmer. Not a stored record on its own — a Session keeps the sections once the workout has been swum.",
+      "properties": {
+        "capped": {
+          "description": "True when a safety cap changed the workout — youth session distance is the only one that can today. Worth surfacing rather than silently shrinking a session someone asked for.",
+          "type": "boolean"
+        },
+        "sections": {
+          "items": {
+            "$ref": "#/$defs/ResolvedSection"
+          },
+          "type": "array"
+        },
+        "swimmer_id": {
+          "type": "string"
+        },
+        "template_id": {
+          "type": "string"
+        },
+        "total_distance": {
+          "description": "Includes the easy-swim equivalent of any time-measured set, so one number stays comparable week to week.",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "swimmer_id",
+        "template_id",
+        "sections",
+        "total_distance",
+        "capped"
+      ],
+      "title": "ResolvedWorkout",
+      "type": "object"
+    },
     "Session": {
       "additionalProperties": false,
       "description": "One swim. Swims are not measured: a session records how it felt, and the adaptation rules run off that.",
@@ -560,9 +734,9 @@
           "type": "string"
         },
         "resolved_sets": {
-          "description": "Filled by the resolver in step 5; absent until then.",
+          "description": "What was actually swum, with every number decided.",
           "items": {
-            "$ref": "#/$defs/ParsedSection"
+            "$ref": "#/$defs/ResolvedSection"
           },
           "type": [
             "array",
@@ -778,6 +952,30 @@
       "additionalProperties": false,
       "description": "The whole store, which is also the shape of the JSON export/import file. This is the schema's tree root, so the generated JSON Schema validates an import file directly.",
       "properties": {
+        "activities": {
+          "items": {
+            "$ref": "#/$defs/Activity"
+          },
+          "type": "array"
+        },
+        "effort_bands": {
+          "items": {
+            "$ref": "#/$defs/EffortBand"
+          },
+          "type": "array"
+        },
+        "equipment": {
+          "items": {
+            "$ref": "#/$defs/Equipment"
+          },
+          "type": "array"
+        },
+        "patterns": {
+          "items": {
+            "$ref": "#/$defs/Pattern"
+          },
+          "type": "array"
+        },
         "sessions": {
           "items": {
             "$ref": "#/$defs/Session"
@@ -786,6 +984,12 @@
         },
         "settings": {
           "$ref": "#/$defs/Settings"
+        },
+        "structures": {
+          "items": {
+            "$ref": "#/$defs/Structure"
+          },
+          "type": "array"
         },
         "swimmers": {
           "items": {
@@ -816,7 +1020,12 @@
         "templates",
         "sessions",
         "test_sets",
-        "settings"
+        "settings",
+        "activities",
+        "equipment",
+        "effort_bands",
+        "patterns",
+        "structures"
       ],
       "title": "StoreSnapshot",
       "type": "object"
@@ -844,6 +1053,13 @@
           "minItems": 1,
           "type": "array"
         },
+        "created_at": {
+          "type": "integer"
+        },
+        "deleted": {
+          "description": "Lets a swimmer hide a shipped entry without it being dropped.",
+          "type": "boolean"
+        },
         "id": {
           "type": "string"
         },
@@ -854,11 +1070,17 @@
         },
         "name": {
           "type": "string"
+        },
+        "updated_at": {
+          "type": "integer"
         }
       },
       "required": [
         "min_swimmers",
         "id",
+        "created_at",
+        "updated_at",
+        "deleted",
         "name",
         "aliases"
       ],
@@ -976,7 +1198,7 @@
     },
     "Term": {
       "additionalProperties": false,
-      "description": "What every catalogue entry has in common: a stable id, a display name, and the words a template author might actually write for it.",
+      "description": "What every catalogue entry has in common: a stable id, a display name, and the words a template author might actually write for it.\nCatalogue entries carry the same sync envelope as every other record, because once seeded that is what they are. Their id is semantic rather than a UUID — a parsed set refers to `free` and `back_float`, and those references have to survive an export and an import on another phone.",
       "properties": {
         "aliases": {
           "description": "The words a template author might write for it. Matched normalised, so case and stray whitespace in a row a swimmer added do not stop it matching.",
@@ -986,15 +1208,28 @@
           "minItems": 1,
           "type": "array"
         },
+        "created_at": {
+          "type": "integer"
+        },
+        "deleted": {
+          "description": "Lets a swimmer hide a shipped entry without it being dropped.",
+          "type": "boolean"
+        },
         "id": {
           "type": "string"
         },
         "name": {
           "type": "string"
+        },
+        "updated_at": {
+          "type": "integer"
         }
       },
       "required": [
         "id",
+        "created_at",
+        "updated_at",
+        "deleted",
         "name",
         "aliases"
       ],
@@ -1091,6 +1326,30 @@
   "description": "The whole store, which is also the shape of the JSON export/import file. This is the schema's tree root, so the generated JSON Schema validates an import file directly.",
   "metamodel_version": "1.11.0",
   "properties": {
+    "activities": {
+      "items": {
+        "$ref": "#/$defs/Activity"
+      },
+      "type": "array"
+    },
+    "effort_bands": {
+      "items": {
+        "$ref": "#/$defs/EffortBand"
+      },
+      "type": "array"
+    },
+    "equipment": {
+      "items": {
+        "$ref": "#/$defs/Equipment"
+      },
+      "type": "array"
+    },
+    "patterns": {
+      "items": {
+        "$ref": "#/$defs/Pattern"
+      },
+      "type": "array"
+    },
     "sessions": {
       "items": {
         "$ref": "#/$defs/Session"
@@ -1099,6 +1358,12 @@
     },
     "settings": {
       "$ref": "#/$defs/Settings"
+    },
+    "structures": {
+      "items": {
+        "$ref": "#/$defs/Structure"
+      },
+      "type": "array"
     },
     "swimmers": {
       "items": {
@@ -1129,7 +1394,12 @@
     "templates",
     "sessions",
     "test_sets",
-    "settings"
+    "settings",
+    "activities",
+    "equipment",
+    "effort_bands",
+    "patterns",
+    "structures"
   ],
   "title": "swimbuddy",
   "type": "object",

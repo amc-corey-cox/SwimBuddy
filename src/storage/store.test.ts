@@ -1,8 +1,9 @@
 import 'fake-indexeddb/auto'
 import { beforeEach, describe, expect, it } from 'vitest'
 import type { Session, Swimmer, Uuid } from '../core/types'
+import { SCHEMA_VERSION } from '../core/types'
 import { openStore, type StoreDependencies, type SwimBuddyStore } from './store'
-import { MIGRATIONS, type Migration } from './schema'
+import { DATABASE_VERSION, MIGRATIONS, type Migration } from './schema'
 import { openDatabase } from './db'
 
 /**
@@ -295,12 +296,19 @@ describe('snapshot', () => {
     await store.swimmers.create({ ...aSwimmer })
     const snapshot = await store.snapshot()
 
-    expect(snapshot.version).toBe(1)
+    expect(snapshot.version).toBe(SCHEMA_VERSION)
     expect(snapshot.swimmers).toHaveLength(1)
     expect(snapshot.templates).toEqual([])
     expect(snapshot.sessions).toEqual([])
     expect(snapshot.test_sets).toEqual([])
     expect(snapshot.settings.pool_unit).toBe('yards')
+    // Empty until seeded, but present: an export missing the catalogues would
+    // import as a store whose templates point at activities nobody has.
+    expect(snapshot.activities).toEqual([])
+    expect(snapshot.equipment).toEqual([])
+    expect(snapshot.effort_bands).toEqual([])
+    expect(snapshot.patterns).toEqual([])
+    expect(snapshot.structures).toEqual([])
   })
 
   it('omits tombstones by default and includes them on request', async () => {
@@ -313,12 +321,17 @@ describe('snapshot', () => {
 })
 
 describe('migrations run against a real database', () => {
-  it('creates the version 1 stores and indexes', async () => {
+  it('creates every store and index the migrations describe', async () => {
     const database = await openDatabase({ name: `swim-buddy-v1-${String(++databaseCounter)}` })
 
     expect([...database.objectStoreNames].sort()).toEqual([
+      'activities',
+      'effort_bands',
+      'equipment',
+      'patterns',
       'sessions',
       'settings',
+      'structures',
       'swimmers',
       'templates',
       'test_sets',
@@ -342,8 +355,8 @@ describe('migrations run against a real database', () => {
 
     // A future migration, applied to a database that already ran version 1.
     const addedStore = 'workout_plans'
-    const version2: Migration = {
-      version: 2,
+    const nextVersion: Migration = {
+      version: DATABASE_VERSION + 1,
       description: 'Adds a store, standing in for a future schema change.',
       apply({ database }) {
         // @ts-expect-error the store is not in SwimBuddyDB — that is the point.
@@ -353,8 +366,8 @@ describe('migrations run against a real database', () => {
 
     const database = await openDatabase({
       name,
-      version: 2,
-      migrations: [...MIGRATIONS, version2],
+      version: DATABASE_VERSION + 1,
+      migrations: [...MIGRATIONS, nextVersion],
     })
 
     expect([...database.objectStoreNames]).toContain(addedStore)

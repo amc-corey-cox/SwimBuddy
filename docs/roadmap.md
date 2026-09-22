@@ -15,7 +15,7 @@ Where the project is going and in what order. The spec for each step lives in
 
 ## Status
 
-Steps 1 to 3 are merged.
+Steps 1 to 3 are merged. Steps 4 and 5 are in review.
 
 The set model was reworked during step 3 and the parser now targets it: extent is a
 distance or a duration, a set is repetitions over one or more parts, and activities,
@@ -26,3 +26,9 @@ seeding them into IndexedDB is step 4.
 The model itself is now generated from `schema/swimbuddy.yaml`, a LinkML schema, rather
 than hand-written TypeScript. That also produces a JSON Schema, which is what step 8's
 import path should validate against rather than trusting the file it is handed.
+
+The resolver landed with the youth safety caps, two of whose numbers the spec named but
+never defined. They are written down now and want the author's sign-off — see Safety in
+the spec. Template selection is still to come, and the resolver assumes it: a template
+whose single set exceeds the youth distance cap cannot be trimmed under it, so selection
+has to not offer one.

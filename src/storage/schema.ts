@@ -1,5 +1,16 @@
 import type { DBSchema, IDBPDatabase, IDBPTransaction, StoreNames } from 'idb'
-import type { Session, Settings, Swimmer, Template, TestSet } from '../core/types'
+import type {
+  Activity,
+  EffortBand,
+  Equipment,
+  Pattern,
+  Session,
+  Settings,
+  Structure,
+  Swimmer,
+  Template,
+  TestSet,
+} from '../core/types'
 
 export const DATABASE_NAME = 'swim-buddy'
 
@@ -7,7 +18,7 @@ export const DATABASE_NAME = 'swim-buddy'
  * Bumped whenever a migration is added. Kept in step with
  * `SCHEMA_VERSION` in core/types, which is what the JSON export records.
  */
-export const DATABASE_VERSION = 1
+export const DATABASE_VERSION = 2
 
 /** The settings row is a singleton, addressed by a fixed id. */
 export const SETTINGS_ID = 'f0000000-0000-4000-8000-000000000001'
@@ -26,6 +37,11 @@ export interface SwimBuddyDB extends DBSchema {
     indexes: { by_swimmer: string }
   }
   settings: { key: string; value: Settings }
+  activities: { key: string; value: Activity }
+  equipment: { key: string; value: Equipment }
+  effort_bands: { key: string; value: EffortBand }
+  patterns: { key: string; value: Pattern }
+  structures: { key: string; value: Structure }
 }
 
 export type UpgradeTransaction = IDBPTransaction<
@@ -47,6 +63,17 @@ export interface Migration {
   readonly apply: (context: MigrationContext) => void
 }
 
+/** The stores holding catalogue reference data, in export order. */
+export const CATALOGUE_STORES = [
+  'activities',
+  'equipment',
+  'effort_bands',
+  'patterns',
+  'structures',
+] as const
+
+export type CatalogueStoreName = (typeof CATALOGUE_STORES)[number]
+
 /**
  * Ordered migrations. Never edit one that has shipped: a database in the wild
  * has already run it, and changing it silently diverges the two. Add a new one.
@@ -67,6 +94,19 @@ export const MIGRATIONS: readonly Migration[] = [
       testSets.createIndex('by_swimmer', 'swimmer_id')
 
       database.createObjectStore('settings', { keyPath: 'id' })
+    },
+  },
+  {
+    version: 2,
+    description:
+      'Catalogue stores for activities, equipment, effort bands, patterns and structures.',
+    apply({ database }) {
+      // Keyed by the catalogue's own semantic id rather than a generated one: a
+      // parsed set refers to `free` and `back_float`, and those references have to
+      // survive an export and an import on another phone.
+      for (const store of CATALOGUE_STORES) {
+        database.createObjectStore(store, { keyPath: 'id' })
+      }
     },
   },
 ]
