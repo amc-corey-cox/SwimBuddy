@@ -589,18 +589,12 @@
       "description": "One set with every number decided.",
       "properties": {
         "note": {
-          "type": [
-            "string",
-            "null"
-          ]
+          "type": "string"
         },
         "pace_seconds": {
           "description": "How fast to swim it, in seconds. Distinct from the send-off.",
           "minimum": 1,
-          "type": [
-            "integer",
-            "null"
-          ]
+          "type": "integer"
         },
         "parts": {
           "items": {
@@ -613,9 +607,6 @@
           "anyOf": [
             {
               "$ref": "#/$defs/AppliedPattern"
-            },
-            {
-              "type": "null"
             }
           ]
         },
@@ -630,16 +621,10 @@
         "send_off_seconds": {
           "description": "When to leave, in seconds. Absent when the set prescribes no interval, or when it asked for one relative to a base pace the activity does not have.",
           "minimum": 1,
-          "type": [
-            "integer",
-            "null"
-          ]
+          "type": "integer"
         },
         "structure": {
-          "type": [
-            "string",
-            "null"
-          ]
+          "type": "string"
         }
       },
       "required": [
