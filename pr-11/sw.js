@@ -1,8 +1,8 @@
-/* Generated at build time — see scripts/service-worker-plugin.mjs. */
-const CACHE = 'swim-buddy-muc5sh8o'
+/* Generated at build time — see scripts/service-worker-plugin.ts. */
+const CACHE = 'swim-buddy-muc62rqf'
 const PRECACHE = [
-  "/SwimBuddy/pr-11/assets/index-yOFuJm7v.js",
-  "/SwimBuddy/pr-11/assets/app-DYCEH-BR.js",
+  "/SwimBuddy/pr-11/assets/index-C4wLH79E.js",
+  "/SwimBuddy/pr-11/assets/app-CxhzmhoK.js",
   "/SwimBuddy/pr-11/assets/modifiers-oTsBHyV2.js",
   "/SwimBuddy/pr-11/assets/storage-DupahdBa.js",
   "/SwimBuddy/pr-11/assets/index-cEmeqCrz.css",
@@ -10,6 +10,7 @@ const PRECACHE = [
   "/SwimBuddy/pr-11/manifest.webmanifest",
   "/SwimBuddy/pr-11/icon-192.png",
   "/SwimBuddy/pr-11/icon-512.png",
+  "/SwimBuddy/pr-11/icon-512-maskable.png",
   "/SwimBuddy/pr-11/"
 ]
 
