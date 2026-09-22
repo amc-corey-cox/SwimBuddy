@@ -16,6 +16,12 @@
  *  - A list the schema says may not be empty becomes a non-empty tuple, so
  *    `scopes[0]` is a value rather than possibly undefined.
  *
+ *  - Continuation lines inside a doc comment get their `*` back. A description is
+ *    interpolated straight into one `*` line, so the second paragraph of a
+ *    multi-paragraph one lands outside the comment's left rail — still inside the
+ *    block, but malformed, and one comment-terminating sequence in a description
+ *    away from being a syntax error rather than an eyesore.
+ *
  * What the generator now gets right by itself, and this no longer touches:
  * enum-typed slots, literal discriminants, `any_of` unions, optional properties
  * (emitted as `?` with no `| null`), and per-property doc comments.
@@ -27,8 +33,38 @@
  */
 export function hardenGeneratedTypes(source, shapes) {
   const withUnions = replaceEnums(replaceUnionParents(source, shapes.unions))
+  const withProperties = applyProperties(withUnions, shapes.nonEmptyLists)
 
-  return nameUnions(applyProperties(withUnions, shapes.nonEmptyLists), shapes.unions)
+  return repairDocComments(nameUnions(withProperties, shapes.unions))
+}
+
+/**
+ * Gives every line inside a doc comment its `*` back.
+ *
+ * @param {string} source
+ */
+function repairDocComments(source) {
+  let inside = false
+
+  return source
+    .split('\n')
+    .map((line) => {
+      const opens = line.includes('/**')
+      const closes = line.includes('*/')
+
+      if (opens && !closes) {
+        inside = true
+        return line
+      }
+      if (closes) {
+        inside = false
+        return line
+      }
+      if (!inside || /^\s*\*/.test(line)) return line
+
+      return line.trim() === '' ? ' *' : ` * ${line.trim()}`
+    })
+    .join('\n')
 }
 
 /**
