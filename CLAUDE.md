@@ -34,6 +34,10 @@ blank — the Playwright suite is how that gets checked, not by asking the autho
 These exist so the core can run unchanged on a future sync server, and so the app never
 quietly acquires a network dependency.
 
+- The data model is generated. `schema/swimbuddy.yaml` is a LinkML schema and is the
+  single source of truth; `src/core/model.ts` and `schema/swimbuddy.schema.json` come
+  from it and are never hand-edited. Change the model by changing the schema and
+  running `npm run schema:gen` — see `schema/README.md`.
 - All business logic (parser, resolver, adaptation rules) lives in `src/core/` as pure
   functions with zero DOM and zero storage imports.
 - Storage access goes through a single `src/storage/` interface. No component touches
@@ -46,6 +50,12 @@ ESLint enforces the `src/core/` half of this: the DOM, IndexedDB and `localStora
 globals are banned there, as are imports from `src/storage/` and `src/ui/`. The rest is
 convention, so it needs attention in review.
 
+LinkML is a Python tool and is deliberately not an npm dependency. Nothing in CI, the
+app build or `npm test` may need it: development happens on a phone, and the committed
+generated output is what everything else reads. `npm run schema:setup` builds it and
+applies `schema/patches/`, which carry a gen-typescript fix that has gone upstream and
+is not released yet; `schema:gen` refuses to run without them.
+
 ## Testing notes
 
 - Parser: table-driven tests over every template in the library; assert no line is lost.
@@ -54,6 +64,9 @@ convention, so it needs attention in review.
 - Resolver: distances are multiples of 25; send-offs exceed a realistic swim time for the
   distance by at least 5 seconds.
 - Storage: round-trip export → wipe → import produces an identical store.
+- Schema: the generated JSON Schema validates the fixture store, and rejects the things
+  types cannot — a distance that is not positive, an extent claiming both a distance and
+  a duration, a load factor outside the clamp.
 
 Coverage thresholds are set at what the code actually meets. When they fail, fix the gap
 rather than lowering the bar — the gaps have so far been real untested paths.

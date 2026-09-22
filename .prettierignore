@@ -8,3 +8,7 @@ LICENSE
 
 # The project spec is the author's document; formatting it is not ours to do.
 CLAUDE.md
+
+# Generated from schema/swimbuddy.yaml by `npm run schema:gen`.
+src/core/model.ts
+schema/swimbuddy.schema.json

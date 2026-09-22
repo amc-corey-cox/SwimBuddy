@@ -223,6 +223,11 @@ length, and never schedule two `intensity: hard` templates back to back.
 
 ## Data model
 
+The model below is not maintained by hand. `schema/swimbuddy.yaml` is a LinkML schema
+and is the source of truth; the TypeScript types and a JSON Schema are generated from
+it. This section is the shape in prose — when the two disagree, the schema is right and
+this is stale.
+
 ```
 Swimmer   { id, name, birth_year, base_pace_by_stroke, load_factor, is_youth }
 Activity  { id, name, aliases, paced, stroke_group, mode, extent_kind: distance|time|either }
@@ -261,7 +266,9 @@ Design every record with a future backend in mind, even though v1 is local-only:
   flag; deletes are soft.
 - Keep a schema `version` field in the store and write migrations from the start.
 
-Export/import the entire store as one JSON file — the only "sync" in v1.
+Export/import the entire store as one JSON file — the only "sync" in v1. The generated
+JSON Schema has `StoreSnapshot` as its tree root, so it validates that file directly: an
+import is checked before it is trusted, rather than after it has overwritten something.
 
 ## Screens (v1)
 

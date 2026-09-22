@@ -16,14 +16,14 @@ export default defineConfig(({ mode }) => ({
   test: {
     globals: true,
     environment: 'node',
-    include: ['src/**/*.test.ts'],
+    include: ['src/**/*.test.ts', 'scripts/**/*.test.mjs'],
     coverage: {
       provider: 'v8',
       reporter: ['text-summary', 'html', 'lcov'],
       // The spec requires every rule-based behavior to be unit tested, and
       // src/core/ is where those rules live. UI is covered by e2e instead.
       include: ['src/core/**/*.ts', 'src/fixtures/**/*.ts', 'src/storage/**/*.ts'],
-      exclude: ['**/*.test.ts', 'src/core/types.ts'],
+      exclude: ['**/*.test.ts', 'src/core/types.ts', 'src/core/model.ts'],
       thresholds: {
         statements: 100,
         branches: 95,

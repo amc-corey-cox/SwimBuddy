@@ -9,3 +9,7 @@ coverage/
 screenshots/
 playwright-report/
 test-results/
+
+# The LinkML toolchain: a Python venv, set up per schema/README.md. Never committed.
+# No trailing slash — it is often a symlink to a venv kept outside the repo.
+.linkml

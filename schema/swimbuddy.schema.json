@@ -1,0 +1,1090 @@
+{
+  "$defs": {
+    "Activity": {
+      "additionalProperties": false,
+      "description": "What an activity is and how it is paced.",
+      "properties": {
+        "aliases": {
+          "description": "The words a template author might write for it. Matched normalised, so case and stray whitespace in a row a swimmer added do not stop it matching.",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "type": "array"
+        },
+        "extent_kind": {
+          "$ref": "#/$defs/ActivityExtentKind"
+        },
+        "id": {
+          "type": "string"
+        },
+        "mode": {
+          "$ref": "#/$defs/ActivityMode"
+        },
+        "name": {
+          "type": "string"
+        },
+        "paced": {
+          "description": "A paced activity takes its send-off from the swimmer's base pace for the relevant stroke group. An unpaced one has none, and an interval on it is read literally.",
+          "type": "boolean"
+        },
+        "stroke_group": {
+          "$ref": "#/$defs/StrokeGroup",
+          "description": "Only ever set on a paced activity; an unpaced one has no base pace to look up."
+        }
+      },
+      "required": [
+        "paced",
+        "extent_kind",
+        "id",
+        "name",
+        "aliases"
+      ],
+      "title": "Activity",
+      "type": "object"
+    },
+    "ActivityExtentKind": {
+      "description": "How an activity can be measured. `either` means both — sculling is swum for a distance or held for a time, and the set decides which.",
+      "enum": [
+        "distance",
+        "time",
+        "either"
+      ],
+      "title": "ActivityExtentKind",
+      "type": "string"
+    },
+    "ActivityMode": {
+      "description": "",
+      "enum": [
+        "swim",
+        "kick",
+        "pull",
+        "drill"
+      ],
+      "title": "ActivityMode",
+      "type": "string"
+    },
+    "AppliedPattern": {
+      "additionalProperties": false,
+      "description": "A pattern as it applies to one set, resolved to a scope.",
+      "properties": {
+        "id": {
+          "description": "Catalogue id.",
+          "type": "string"
+        },
+        "range": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RepRange"
+            }
+          ],
+          "description": "Only ever set on an `across_set` pattern; repetitions are what it counts."
+        },
+        "scope": {
+          "$ref": "#/$defs/PatternScope"
+        }
+      },
+      "required": [
+        "id",
+        "scope"
+      ],
+      "title": "AppliedPattern",
+      "type": "object"
+    },
+    "BaseInterval": {
+      "additionalProperties": false,
+      "description": "Relative to the swimmer's base pace for the relevant stroke group.",
+      "properties": {
+        "kind": {
+          "const": "base",
+          "type": "string"
+        },
+        "offset_seconds": {
+          "description": "Seconds added to base pace. Zero for a bare `base`, negative for `base-5`.",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "kind",
+        "offset_seconds"
+      ],
+      "title": "BaseInterval",
+      "type": "object"
+    },
+    "BasePaceByStroke": {
+      "additionalProperties": false,
+      "description": "Free is always tested; the other strokes fall back to free plus a fixed offset.",
+      "properties": {
+        "back": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "breast": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "fly": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "free": {
+          "description": "Sustainable seconds per 100, in the pool's unit.",
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "free"
+      ],
+      "title": "BasePaceByStroke",
+      "type": "object"
+    },
+    "Distance": {
+      "additionalProperties": false,
+      "description": "A distance in pool units. Always a positive multiple of 25.",
+      "properties": {
+        "kind": {
+          "const": "distance",
+          "type": "string"
+        },
+        "value": {
+          "minimum": 1,
+          "type": "integer",
+          "multipleOf": 25
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "title": "Distance",
+      "type": "object"
+    },
+    "Duration": {
+      "additionalProperties": false,
+      "description": "A duration in seconds, taken as written rather than rounded.",
+      "properties": {
+        "kind": {
+          "const": "time",
+          "type": "string"
+        },
+        "seconds": {
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "kind",
+        "seconds"
+      ],
+      "title": "Duration",
+      "type": "object"
+    },
+    "EffortBand": {
+      "additionalProperties": false,
+      "description": "A qualitative effort band. Distinct from pace, which is always a number: \"easy\" is not a time, and no amount of arithmetic turns it into one.",
+      "properties": {
+        "aliases": {
+          "description": "The words a template author might write for it. Matched normalised, so case and stray whitespace in a row a swimmer added do not stop it matching.",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "type": "array"
+        },
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "rank": {
+          "description": "Ordering from easiest to hardest, so a selection rule can ask which of two sets is harder without parsing English. An ordering, never a pace — the gap between two ranks means nothing.",
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "rank",
+        "id",
+        "name",
+        "aliases"
+      ],
+      "title": "EffortBand",
+      "type": "object"
+    },
+    "EffortRating": {
+      "description": "What the swimmer says afterwards. Not an effort band on a set.",
+      "enum": [
+        "too_easy",
+        "about_right",
+        "too_hard"
+      ],
+      "title": "EffortRating",
+      "type": "string"
+    },
+    "Equipment": {
+      "additionalProperties": false,
+      "description": "Something the swimmer holds or wears. Several can apply at once — fins and a snorkel is an ordinary thing to be asked for — so a part carries a list.",
+      "properties": {
+        "aliases": {
+          "description": "The words a template author might write for it. Matched normalised, so case and stray whitespace in a row a swimmer added do not stop it matching.",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "type": "array"
+        },
+        "id": {
+          "type": "string"
+        },
+        "implies_mode": {
+          "$ref": "#/$defs/ActivityMode",
+          "description": "What holding it implies about how the swimmer is moving, where it implies anything."
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "aliases"
+      ],
+      "title": "Equipment",
+      "type": "object"
+    },
+    "Extent": {
+      "additionalProperties": false,
+      "description": "How much of a thing a set part is: a distance in pool units, or a duration. Never both — \"20:00 free\" knows its time and not its distance, and treading water has no distance at all.",
+      "title": "Extent",
+      "type": "object"
+    },
+    "FunRating": {
+      "description": "Youth swimmers only.",
+      "enum": [
+        "up",
+        "down"
+      ],
+      "title": "FunRating",
+      "type": "string"
+    },
+    "Intensity": {
+      "description": "How hard a whole template is meant to be.",
+      "enum": [
+        "easy",
+        "moderate",
+        "hard"
+      ],
+      "title": "Intensity",
+      "type": "string"
+    },
+    "Interval": {
+      "additionalProperties": false,
+      "description": "`base+15`, `base-5`, `base`, or a literal clock time like `1:30`. Used both for a send-off and for a pace target, because a swimmer writes them the same way.",
+      "title": "Interval",
+      "type": "object"
+    },
+    "LevelRange": {
+      "additionalProperties": false,
+      "description": "",
+      "properties": {
+        "max": {
+          "type": "integer"
+        },
+        "min": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "min",
+        "max"
+      ],
+      "title": "LevelRange",
+      "type": "object"
+    },
+    "LiteralInterval": {
+      "additionalProperties": false,
+      "description": "An absolute time, read as written.",
+      "properties": {
+        "kind": {
+          "const": "literal",
+          "type": "string"
+        },
+        "seconds": {
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "kind",
+        "seconds"
+      ],
+      "title": "LiteralInterval",
+      "type": "object"
+    },
+    "MetaLine": {
+      "additionalProperties": false,
+      "description": "A `key: value` header field, from the block before the first section.",
+      "properties": {
+        "key": {
+          "type": "string"
+        },
+        "kind": {
+          "const": "meta",
+          "type": "string"
+        },
+        "raw": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "key",
+        "value",
+        "raw"
+      ],
+      "title": "MetaLine",
+      "type": "object"
+    },
+    "ParsedLine": {
+      "additionalProperties": false,
+      "description": "One line of a template after parsing. Every variant keeps `raw`: unparseable lines are preserved verbatim and never lost, and keeping the original text on the parsed variants too means the workout view can always fall back to it.",
+      "title": "ParsedLine",
+      "type": "object"
+    },
+    "ParsedSection": {
+      "additionalProperties": false,
+      "description": "A named block of a template: `warmup:`, `main:`, and so on.",
+      "properties": {
+        "lines": {
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/SetLine"
+              },
+              {
+                "$ref": "#/$defs/MetaLine"
+              },
+              {
+                "$ref": "#/$defs/UnparsedLine"
+              }
+            ]
+          },
+          "type": "array"
+        },
+        "name": {
+          "type": "string"
+        },
+        "raw": {
+          "description": "The header line as written. Absent for the leading block, which has no header of its own and is where the template's metadata lives.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "lines"
+      ],
+      "title": "ParsedSection",
+      "type": "object"
+    },
+    "Pattern": {
+      "additionalProperties": false,
+      "description": "A shape over a set, or within each repetition of one.",
+      "properties": {
+        "aliases": {
+          "description": "The words a template author might write for it. Matched normalised, so case and stray whitespace in a row a swimmer added do not stop it matching.",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "type": "array"
+        },
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "scopes": {
+          "description": "The scopes this pattern can carry, the one it means by default first.",
+          "items": {
+            "$ref": "#/$defs/PatternScope"
+          },
+          "minItems": 1,
+          "type": "array"
+        }
+      },
+      "required": [
+        "scopes",
+        "id",
+        "name",
+        "aliases"
+      ],
+      "title": "Pattern",
+      "type": "object"
+    },
+    "PatternScope": {
+      "description": "Where a pattern applies. `build` is the reason this exists and is two different instructions: a bare \"4x50 build\" shapes each repetition, starting easy and finishing fast within the 50, while \"4x50 build 1-4\" shapes the set, each repetition faster than the one before it. Neither expresses the other.",
+      "enum": [
+        "within_rep",
+        "across_set"
+      ],
+      "title": "PatternScope",
+      "type": "string"
+    },
+    "PoolUnit": {
+      "description": "",
+      "enum": [
+        "yards",
+        "meters"
+      ],
+      "title": "PoolUnit",
+      "type": "string"
+    },
+    "RecordMeta": {
+      "additionalProperties": false,
+      "description": "Every stored record carries sync metadata from day one: deletes are soft, and both timestamps exist so a future backend can resolve conflicts.",
+      "properties": {
+        "created_at": {
+          "type": "integer"
+        },
+        "deleted": {
+          "type": "boolean"
+        },
+        "id": {
+          "type": "string"
+        },
+        "updated_at": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "created_at",
+        "updated_at",
+        "deleted"
+      ],
+      "title": "RecordMeta",
+      "type": "object"
+    },
+    "RepRange": {
+      "additionalProperties": false,
+      "description": "The repetitions a pattern spans — `descend 1-4` is 1 through 4.",
+      "properties": {
+        "from": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "to": {
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "from",
+        "to"
+      ],
+      "title": "RepRange",
+      "type": "object"
+    },
+    "RepsSlot": {
+      "additionalProperties": false,
+      "description": "A `{reps:MIN-MAX}` slot, resolved per swimmer from their load factor.",
+      "properties": {
+        "max": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "min": {
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "min",
+        "max"
+      ],
+      "title": "RepsSlot",
+      "type": "object"
+    },
+    "Session": {
+      "additionalProperties": false,
+      "description": "One swim. Swims are not measured: a session records how it felt, and the adaptation rules run off that.",
+      "properties": {
+        "completed": {
+          "description": "Whether the main set was finished. Absent until the swimmer says.",
+          "type": "boolean"
+        },
+        "created_at": {
+          "type": "integer"
+        },
+        "date": {
+          "type": "integer"
+        },
+        "deleted": {
+          "type": "boolean"
+        },
+        "effort_rating": {
+          "$ref": "#/$defs/EffortRating",
+          "description": "Absent until the swimmer rates the session."
+        },
+        "fun_rating": {
+          "$ref": "#/$defs/FunRating",
+          "description": "Youth swimmers only."
+        },
+        "id": {
+          "type": "string"
+        },
+        "notes": {
+          "type": "string"
+        },
+        "resolved_sets": {
+          "description": "Filled by the resolver in step 5; absent until then.",
+          "items": {
+            "$ref": "#/$defs/ParsedSection"
+          },
+          "type": "array"
+        },
+        "swimmer_id": {
+          "type": "string"
+        },
+        "template_id": {
+          "type": "string"
+        },
+        "total_distance": {
+          "description": "Includes the easy-swim equivalent of any time-measured sets, so one number stays comparable week to week.",
+          "type": "integer"
+        },
+        "updated_at": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "swimmer_id",
+        "template_id",
+        "date",
+        "total_distance",
+        "notes",
+        "id",
+        "created_at",
+        "updated_at",
+        "deleted"
+      ],
+      "title": "Session",
+      "type": "object"
+    },
+    "SetLine": {
+      "additionalProperties": false,
+      "description": "A repetition count over one or more parts.",
+      "properties": {
+        "interval": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BaseInterval"
+            },
+            {
+              "$ref": "#/$defs/LiteralInterval"
+            }
+          ],
+          "description": "When to leave: the send-off."
+        },
+        "kind": {
+          "const": "set",
+          "type": "string"
+        },
+        "note": {
+          "description": "Text after `#`. Displayed, never parsed.",
+          "type": "string"
+        },
+        "pace": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BaseInterval"
+            },
+            {
+              "$ref": "#/$defs/LiteralInterval"
+            }
+          ],
+          "description": "How fast to swim it. Distinct from the interval — a swimmer can be given both, and \"leave every 1:30\" is a different instruction from \"hold 1:20\"."
+        },
+        "parts": {
+          "items": {
+            "$ref": "#/$defs/SetPart"
+          },
+          "minItems": 1,
+          "type": "array"
+        },
+        "pattern": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AppliedPattern"
+            }
+          ],
+          "description": "A shape over the set. Scoped rather than a bare id, because the same word means different things at different scopes."
+        },
+        "raw": {
+          "type": "string"
+        },
+        "reps": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "$ref": "#/$defs/RepsSlot"
+            }
+          ],
+          "description": "A fixed count, or a `{reps:MIN-MAX}` slot resolved per swimmer."
+        },
+        "structure": {
+          "description": "Catalogue id: how repetitions are shared out, when they are shared at all.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "reps",
+        "parts",
+        "raw"
+      ],
+      "title": "SetLine",
+      "type": "object"
+    },
+    "SetPart": {
+      "additionalProperties": false,
+      "description": "One activity within a set. Most sets have exactly one part; a compound set like `25 drill / 50 swim` has several inside a single repetition.",
+      "properties": {
+        "activity": {
+          "description": "Catalogue id, when the descriptor named an activity we recognise.",
+          "type": "string"
+        },
+        "descriptor": {
+          "description": "The words naming the activity and its modifiers, verbatim.",
+          "type": "string"
+        },
+        "effort": {
+          "description": "Catalogue id of the effort band, when the descriptor named one.",
+          "type": "string"
+        },
+        "equipment": {
+          "description": "Catalogue ids, in the order the descriptor named them. Absent when none.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "extent": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Distance"
+            },
+            {
+              "$ref": "#/$defs/Duration"
+            }
+          ]
+        }
+      },
+      "required": [
+        "extent",
+        "descriptor"
+      ],
+      "title": "SetPart",
+      "type": "object"
+    },
+    "Settings": {
+      "additionalProperties": false,
+      "description": "",
+      "properties": {
+        "created_at": {
+          "type": "integer"
+        },
+        "deleted": {
+          "type": "boolean"
+        },
+        "id": {
+          "type": "string"
+        },
+        "pool_length": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "pool_unit": {
+          "$ref": "#/$defs/PoolUnit"
+        },
+        "updated_at": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "pool_unit",
+        "pool_length",
+        "id",
+        "created_at",
+        "updated_at",
+        "deleted"
+      ],
+      "title": "Settings",
+      "type": "object"
+    },
+    "StoreSnapshot": {
+      "additionalProperties": false,
+      "description": "The whole store, which is also the shape of the JSON export/import file. This is the schema's tree root, so the generated JSON Schema validates an import file directly.",
+      "properties": {
+        "sessions": {
+          "items": {
+            "$ref": "#/$defs/Session"
+          },
+          "type": "array"
+        },
+        "settings": {
+          "$ref": "#/$defs/Settings"
+        },
+        "swimmers": {
+          "items": {
+            "$ref": "#/$defs/Swimmer"
+          },
+          "type": "array"
+        },
+        "templates": {
+          "items": {
+            "$ref": "#/$defs/Template"
+          },
+          "type": "array"
+        },
+        "test_sets": {
+          "items": {
+            "$ref": "#/$defs/TestSet"
+          },
+          "type": "array"
+        },
+        "version": {
+          "description": "Bumped whenever a migration is added.",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "version",
+        "swimmers",
+        "templates",
+        "sessions",
+        "test_sets",
+        "settings"
+      ],
+      "title": "StoreSnapshot",
+      "type": "object"
+    },
+    "StrokeGroup": {
+      "description": "",
+      "enum": [
+        "free",
+        "back",
+        "breast",
+        "fly"
+      ],
+      "title": "StrokeGroup",
+      "type": "string"
+    },
+    "Structure": {
+      "additionalProperties": false,
+      "description": "How repetitions are distributed between swimmers, rather than what is swum.",
+      "properties": {
+        "aliases": {
+          "description": "The words a template author might write for it. Matched normalised, so case and stray whitespace in a row a swimmer added do not stop it matching.",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "type": "array"
+        },
+        "id": {
+          "type": "string"
+        },
+        "min_swimmers": {
+          "description": "A relay is not a thing one swimmer can do alone.",
+          "minimum": 2,
+          "type": "integer"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "min_swimmers",
+        "id",
+        "name",
+        "aliases"
+      ],
+      "title": "Structure",
+      "type": "object"
+    },
+    "Swimmer": {
+      "additionalProperties": false,
+      "description": "",
+      "properties": {
+        "base_pace_by_stroke": {
+          "$ref": "#/$defs/BasePaceByStroke"
+        },
+        "birth_year": {
+          "type": "integer"
+        },
+        "created_at": {
+          "type": "integer"
+        },
+        "deleted": {
+          "type": "boolean"
+        },
+        "id": {
+          "type": "string"
+        },
+        "is_youth": {
+          "type": "boolean"
+        },
+        "load_factor": {
+          "description": "Scales rep counts and send-offs. Clamped by the adaptation rules.",
+          "maximum": 1.4,
+          "minimum": 0.6,
+          "type": "number"
+        },
+        "name": {
+          "type": "string"
+        },
+        "updated_at": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "name",
+        "birth_year",
+        "base_pace_by_stroke",
+        "load_factor",
+        "is_youth",
+        "id",
+        "created_at",
+        "updated_at",
+        "deleted"
+      ],
+      "title": "Swimmer",
+      "type": "object"
+    },
+    "Template": {
+      "additionalProperties": false,
+      "description": "An arrangement — named sections holding sets in order.",
+      "properties": {
+        "created_at": {
+          "type": "integer"
+        },
+        "deleted": {
+          "type": "boolean"
+        },
+        "id": {
+          "type": "string"
+        },
+        "intensity": {
+          "$ref": "#/$defs/Intensity"
+        },
+        "level_range": {
+          "$ref": "#/$defs/LevelRange"
+        },
+        "name": {
+          "type": "string"
+        },
+        "parsed_sets": {
+          "description": "Cache of `raw_text` parsed by the template parser.",
+          "items": {
+            "$ref": "#/$defs/ParsedSection"
+          },
+          "type": "array"
+        },
+        "raw_text": {
+          "description": "The template in swim shorthand. Authoritative; everything else is derived.",
+          "type": "string"
+        },
+        "tags": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "updated_at": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "name",
+        "tags",
+        "intensity",
+        "level_range",
+        "raw_text",
+        "id",
+        "created_at",
+        "updated_at",
+        "deleted"
+      ],
+      "title": "Template",
+      "type": "object"
+    },
+    "Term": {
+      "additionalProperties": false,
+      "description": "What every catalogue entry has in common: a stable id, a display name, and the words a template author might actually write for it.",
+      "properties": {
+        "aliases": {
+          "description": "The words a template author might write for it. Matched normalised, so case and stray whitespace in a row a swimmer added do not stop it matching.",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "type": "array"
+        },
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "aliases"
+      ],
+      "title": "Term",
+      "type": "object"
+    },
+    "TestProtocol": {
+      "description": "Which pair of swims a base pace test recorded. Adults swim a 400 and a 200, youth a 200 and a 100, and the two compute base pace differently.",
+      "enum": [
+        "400/200",
+        "200/100"
+      ],
+      "title": "TestProtocol",
+      "type": "string"
+    },
+    "TestSet": {
+      "additionalProperties": false,
+      "description": "A base pace test.",
+      "properties": {
+        "computed_base_pace": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "created_at": {
+          "type": "integer"
+        },
+        "date": {
+          "type": "integer"
+        },
+        "deleted": {
+          "type": "boolean"
+        },
+        "id": {
+          "type": "string"
+        },
+        "protocol": {
+          "$ref": "#/$defs/TestProtocol"
+        },
+        "swimmer_id": {
+          "type": "string"
+        },
+        "t200": {
+          "description": "Seconds for the shorter swim: the 200, or the 100 under the youth protocol.",
+          "minimum": 1,
+          "type": "integer"
+        },
+        "t400": {
+          "description": "Seconds for the longer swim: the 400, or the 200 under the youth protocol.",
+          "minimum": 1,
+          "type": "integer"
+        },
+        "updated_at": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "swimmer_id",
+        "date",
+        "protocol",
+        "t400",
+        "t200",
+        "computed_base_pace",
+        "id",
+        "created_at",
+        "updated_at",
+        "deleted"
+      ],
+      "title": "TestSet",
+      "type": "object"
+    },
+    "UnparsedLine": {
+      "additionalProperties": false,
+      "description": "A line the grammar does not recognise, kept exactly as written.",
+      "properties": {
+        "kind": {
+          "const": "unparsed",
+          "type": "string"
+        },
+        "raw": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "raw"
+      ],
+      "title": "UnparsedLine",
+      "type": "object"
+    }
+  },
+  "$id": "https://amc-corey-cox.github.io/SwimBuddy/schema",
+  "$schema": "https://json-schema.org/draft/2019-09/schema",
+  "additionalProperties": false,
+  "description": "The whole store, which is also the shape of the JSON export/import file. This is the schema's tree root, so the generated JSON Schema validates an import file directly.",
+  "metamodel_version": "1.11.0",
+  "properties": {
+    "sessions": {
+      "items": {
+        "$ref": "#/$defs/Session"
+      },
+      "type": "array"
+    },
+    "settings": {
+      "$ref": "#/$defs/Settings"
+    },
+    "swimmers": {
+      "items": {
+        "$ref": "#/$defs/Swimmer"
+      },
+      "type": "array"
+    },
+    "templates": {
+      "items": {
+        "$ref": "#/$defs/Template"
+      },
+      "type": "array"
+    },
+    "test_sets": {
+      "items": {
+        "$ref": "#/$defs/TestSet"
+      },
+      "type": "array"
+    },
+    "version": {
+      "description": "Bumped whenever a migration is added.",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "version",
+    "swimmers",
+    "templates",
+    "sessions",
+    "test_sets",
+    "settings"
+  ],
+  "title": "swimbuddy",
+  "type": "object",
+  "version": null
+}
