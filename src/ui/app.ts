@@ -80,7 +80,12 @@ export async function startApp(options: AppOptions): Promise<void> {
   ): Promise<{ selection: Selection | undefined; adaptation: Adaptation }> {
     const stored = await store.sessions.forSwimmer(swimmer.id)
     const recentSessions = [...stored].sort((a, b) => b.date - a.date)
-    const adaptation = adapt(swimmer, recentSessions, now())
+
+    // One reading of the clock for the whole plan. Two would let adaptation and
+    // selection land either side of a week boundary and disagree about the same
+    // swimmer, which is the sort of bug that only shows up on a Sunday night.
+    const at = now()
+    const adaptation = adapt(swimmer, recentSessions, at)
 
     const selection = selectTemplate({
       // Selection sees the adapted swimmer, not the stored one: how much work
@@ -89,7 +94,10 @@ export async function startApp(options: AppOptions): Promise<void> {
       templates,
       recentSessions,
       requestedMinutes: minutes,
-      now: now(),
+      now: at,
+      ...(adaptation.weekly_distance_budget === null
+        ? {}
+        : { weeklyDistanceBudget: adaptation.weekly_distance_budget }),
     })
 
     return { selection, adaptation }

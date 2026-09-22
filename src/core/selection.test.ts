@@ -248,6 +248,27 @@ describe('the youth swimmer', () => {
   })
 })
 
+describe('the weekly budget', () => {
+  it('is ignored when there is none', () => {
+    expect(selectTemplate(context())?.template.id).toBe('a')
+  })
+
+  it('rules out a template that would break the week', () => {
+    const big = template('big', { raw_text: 'main:\n  10x100 free @ base+15' })
+    const small = template('small', { raw_text: 'main:\n  2x100 free @ base+15' })
+
+    const chosen = selectTemplate(context({ templates: [big, small], weeklyDistanceBudget: 400 }))
+
+    expect(chosen?.template.id).toBe('small')
+  })
+
+  it('offers nothing when the week is full', () => {
+    // Better to be told the week is done than handed a token workout: the
+    // resolver will not trim below one set, so something would always be over.
+    expect(selectTemplate(context({ weeklyDistanceBudget: 0 }))).toBeUndefined()
+  })
+})
+
 describe('the reasons given', () => {
   it('always says how long it will take', () => {
     expect(selectTemplate(context())?.reasons[0]).toMatch(/^About \d+ minutes$/)

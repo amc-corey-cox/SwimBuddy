@@ -39,6 +39,17 @@ export interface SelectionContext {
   readonly recentSessions: readonly Session[]
   readonly requestedMinutes: number
   readonly now: Timestamp
+  /**
+   * The most this session may add under the weekly growth rule, when there is a
+   * trailing week to measure against.
+   *
+   * Checked here rather than left to the resolver, because the resolver will not
+   * trim a workout below a single set — so a budget smaller than the smallest
+   * template is a question only selection can answer, and the answer is to offer
+   * nothing. "The week is full" is a better thing to be told than a hundred-yard
+   * workout that pretends otherwise.
+   */
+  readonly weeklyDistanceBudget?: number
 }
 
 export interface Selection {
@@ -87,11 +98,13 @@ export function selectTemplate(context: SelectionContext): Selection | undefined
       const workout = resolveTemplate(template, swimmer)
       return { template, workout, minutes: estimateMinutes(workout.total_distance, swimmer) }
     })
-    // A template the resolver could not bring under this swimmer's cap is one the
-    // resolver asked selection not to offer. This is that promise being kept.
-    .filter(
-      ({ workout }) =>
-        caps.max_session_distance === null || workout.total_distance <= caps.max_session_distance,
+    // A template the resolver could not bring under a limit that applies is one the
+    // resolver asked selection not to offer. This is that promise being kept, for
+    // the swimmer's own cap and for the week's remaining budget alike.
+    .filter(({ workout }) =>
+      [caps.max_session_distance, context.weeklyDistanceBudget]
+        .filter((limit): limit is number => limit !== undefined && limit !== null)
+        .every((limit) => workout.total_distance <= limit),
     )
     // Two hard sessions back to back is the one rule with no score attached: it is
     // a refusal, not a preference.

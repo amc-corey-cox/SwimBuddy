@@ -6,6 +6,22 @@ import { expect, test, type Page } from '@playwright/test'
  * is whether the four screens actually join up in a browser.
  */
 
+/**
+ * Steps through the cards until the last one.
+ *
+ * Asserts the Finish button arrived rather than trusting the loop: falling out of
+ * it and clicking a button that is not there fails with a timeout that says
+ * nothing about why.
+ */
+async function advanceToFinish(page: Page): Promise<void> {
+  for (let guard = 0; guard < 50; guard += 1) {
+    if ((await page.getByTestId('finish').count()) > 0) break
+    await page.getByTestId('next').click()
+  }
+
+  await expect(page.getByTestId('finish')).toBeVisible()
+}
+
 async function startSwimming(page: Page): Promise<void> {
   await page.goto('/SwimBuddy/')
   await page.getByTestId('screen-home').getByRole('button').first().click()
@@ -17,12 +33,7 @@ async function startSwimming(page: Page): Promise<void> {
 test('a swimmer can get a workout and rate it', async ({ page }) => {
   await startSwimming(page)
 
-  // Work through every card, whatever the chosen template turns out to hold.
-  for (let guard = 0; guard < 50; guard += 1) {
-    if ((await page.getByTestId('finish').count()) > 0) break
-    await page.getByTestId('next').click()
-  }
-
+  await advanceToFinish(page)
   await page.getByTestId('finish').click()
   await expect(page.getByTestId('screen-post-swim')).toBeVisible()
 
@@ -161,10 +172,7 @@ test('a rating changes the next swim', async ({ page }) => {
   await expect(page.getByTestId('reasons')).not.toContainText('Last swim was too hard')
 
   await page.getByTestId('start').click()
-  for (let guard = 0; guard < 50; guard += 1) {
-    if ((await page.getByTestId('finish').count()) > 0) break
-    await page.getByTestId('next').click()
-  }
+  await advanceToFinish(page)
   await page.getByTestId('finish').click()
   await page.getByTestId('effort-too_hard').click()
 
