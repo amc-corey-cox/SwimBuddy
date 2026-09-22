@@ -89,9 +89,6 @@
           "anyOf": [
             {
               "$ref": "#/$defs/RepRange"
-            },
-            {
-              "type": "null"
             }
           ],
           "description": "Only ever set on an `across_set` pattern; repetitions are what it counts."
@@ -133,24 +130,15 @@
       "properties": {
         "back": {
           "minimum": 1,
-          "type": [
-            "integer",
-            "null"
-          ]
+          "type": "integer"
         },
         "breast": {
           "minimum": 1,
-          "type": [
-            "integer",
-            "null"
-          ]
+          "type": "integer"
         },
         "fly": {
           "minimum": 1,
-          "type": [
-            "integer",
-            "null"
-          ]
+          "type": "integer"
         },
         "free": {
           "description": "Sustainable seconds per 100, in the pool's unit.",
@@ -174,7 +162,8 @@
         },
         "value": {
           "minimum": 1,
-          "type": "integer"
+          "type": "integer",
+          "multipleOf": 25
         }
       },
       "required": [
@@ -431,10 +420,7 @@
         },
         "raw": {
           "description": "The header line as written. Absent for the leading block, which has no header of its own and is where the template's metadata lives.",
-          "type": [
-            "string",
-            "null"
-          ]
+          "type": "string"
         }
       },
       "required": [
@@ -705,10 +691,7 @@
       "properties": {
         "completed": {
           "description": "Whether the main set was finished. Absent until the swimmer says.",
-          "type": [
-            "boolean",
-            "null"
-          ]
+          "type": "boolean"
         },
         "created_at": {
           "type": "integer"
@@ -738,10 +721,7 @@
           "items": {
             "$ref": "#/$defs/ResolvedSection"
           },
-          "type": [
-            "array",
-            "null"
-          ]
+          "type": "array"
         },
         "swimmer_id": {
           "type": "string"
@@ -782,9 +762,6 @@
             },
             {
               "$ref": "#/$defs/LiteralInterval"
-            },
-            {
-              "type": "null"
             }
           ],
           "description": "When to leave: the send-off."
@@ -795,10 +772,7 @@
         },
         "note": {
           "description": "Text after `#`. Displayed, never parsed.",
-          "type": [
-            "string",
-            "null"
-          ]
+          "type": "string"
         },
         "pace": {
           "anyOf": [
@@ -807,9 +781,6 @@
             },
             {
               "$ref": "#/$defs/LiteralInterval"
-            },
-            {
-              "type": "null"
             }
           ],
           "description": "How fast to swim it. Distinct from the interval — a swimmer can be given both, and \"leave every 1:30\" is a different instruction from \"hold 1:20\"."
@@ -825,9 +796,6 @@
           "anyOf": [
             {
               "$ref": "#/$defs/AppliedPattern"
-            },
-            {
-              "type": "null"
             }
           ],
           "description": "A shape over the set. Scoped rather than a bare id, because the same word means different things at different scopes."
@@ -848,10 +816,7 @@
         },
         "structure": {
           "description": "Catalogue id: how repetitions are shared out, when they are shared at all.",
-          "type": [
-            "string",
-            "null"
-          ]
+          "type": "string"
         }
       },
       "required": [
@@ -869,10 +834,7 @@
       "properties": {
         "activity": {
           "description": "Catalogue id, when the descriptor named an activity we recognise.",
-          "type": [
-            "string",
-            "null"
-          ]
+          "type": "string"
         },
         "descriptor": {
           "description": "The words naming the activity and its modifiers, verbatim.",
@@ -880,20 +842,14 @@
         },
         "effort": {
           "description": "Catalogue id of the effort band, when the descriptor named one.",
-          "type": [
-            "string",
-            "null"
-          ]
+          "type": "string"
         },
         "equipment": {
           "description": "Catalogue ids, in the order the descriptor named them. Absent when none.",
           "items": {
             "type": "string"
           },
-          "type": [
-            "array",
-            "null"
-          ]
+          "type": "array"
         },
         "extent": {
           "anyOf": [
@@ -1163,10 +1119,7 @@
           "items": {
             "$ref": "#/$defs/ParsedSection"
           },
-          "type": [
-            "array",
-            "null"
-          ]
+          "type": "array"
         },
         "raw_text": {
           "description": "The template in swim shorthand. Authoritative; everything else is derived.",

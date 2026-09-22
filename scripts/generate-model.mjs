@@ -18,6 +18,7 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parse as parseYaml } from 'yaml'
 import { nonEmptyListsOf, unionsOf } from './schema-shapes.mjs'
+import { applyMultiples, dropNullBranches } from './tighten-json-schema.mjs'
 import { hardenGeneratedTypes } from './harden-generated-types.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -112,6 +113,11 @@ function main() {
   // carrying fields we do not know is a version mismatch or a hand edit, and either
   // is worth refusing rather than silently dropping.
   schema.additionalProperties = false
+
+  // The two generated artifacts have to agree, or validating an import proves
+  // nothing about whether the model can hold it.
+  dropNullBranches(schema)
+  applyMultiples(schema)
 
   mkdirSync(dirname(JSON_SCHEMA), { recursive: true })
   writeFileSync(JSON_SCHEMA, `${JSON.stringify(schema, null, 2)}\n`)

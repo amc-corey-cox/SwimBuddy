@@ -80,3 +80,12 @@ non-empty tuple, so `scopes[0]` is a value rather than possibly undefined.
 
 The first two would be reasonable options upstream. The other two are this
 codebase's house style rather than anything LinkML got wrong.
+
+`scripts/tighten-json-schema.mjs` does the same job for the JSON Schema, and for
+the same reason: the two artifacts are generated from one schema and are only
+worth having if they agree. LinkML writes an optional slot as `["string", "null"]`,
+so without this the schema would accept an explicit null that the TypeScript —
+which uses absence throughout — cannot hold, and an import would validate and then
+fail to type-check against its own model. It also applies the spec's "distances are
+multiples of 25" rule, which LinkML has no way to express: `minimum_value` alone
+lets a 37 through.
