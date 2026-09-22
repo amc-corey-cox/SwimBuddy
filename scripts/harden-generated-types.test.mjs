@@ -104,6 +104,50 @@ describe('readonly', () => {
   })
 })
 
+describe('doc comments', () => {
+  it('gives a continuation line its star back', () => {
+    // A multi-paragraph description is interpolated into a single `*` line, so
+    // everything after the first blank line falls outside the comment's rail.
+    const source = [
+      '/**',
+      ' * First paragraph.',
+      'Second paragraph.',
+      ' */',
+      'export type X = string',
+    ].join('\n')
+
+    expect(harden(source)).toBe(
+      ['/**', ' * First paragraph.', ' * Second paragraph.', ' */', 'export type X = string'].join(
+        '\n',
+      ),
+    )
+  })
+
+  it('leaves a blank continuation line as a bare star', () => {
+    const source = ['/**', ' * First.', '', 'Second.', ' */'].join('\n')
+
+    expect(harden(source)).toBe(['/**', ' * First.', ' *', ' * Second.', ' */'].join('\n'))
+  })
+
+  it('does not touch code outside a comment', () => {
+    const source = [
+      '/**',
+      ' * Doc.',
+      ' */',
+      'export type X = string',
+      'export type Y = number',
+    ].join('\n')
+
+    expect(harden(source)).toBe(source)
+  })
+
+  it('leaves a single-line comment alone', () => {
+    const source = ['/** Short. */', 'export type X = string'].join('\n')
+
+    expect(harden(source)).toBe(source)
+  })
+})
+
 describe('non-empty lists', () => {
   it('becomes a tuple, so the first element is a value rather than undefined', () => {
     expect(harden(iface('parts: SetPart[],'), SHAPES)).toBe(

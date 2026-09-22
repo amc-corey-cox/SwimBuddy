@@ -247,7 +247,7 @@ export interface ResolvedWorkout {
 
 /**
  * What every catalogue entry has in common: a stable id, a display name, and the words a template author might actually write for it.
-Catalogue entries carry the same sync envelope as every other record, because once seeded that is what they are. Their id is semantic rather than a UUID — a parsed set refers to `free` and `back_float`, and those references have to survive an export and an import on another phone.
+ * Catalogue entries carry the same sync envelope as every other record, because once seeded that is what they are. Their id is semantic rather than a UUID — a parsed set refers to `free` and `back_float`, and those references have to survive an export and an import on another phone.
  */
 export interface Term {
     readonly id: string,

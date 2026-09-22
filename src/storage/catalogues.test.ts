@@ -12,7 +12,7 @@ let counter = 0
 
 function testDependencies(): StoreDependencies {
   let tick = 0
-  return { now: () => 1_700_000_000_000 + ++tick, newId: () => `id-${String(++tick)}` }
+  return { now: () => Date.UTC(2026, 5, 1) + ++tick, newId: () => `id-${String(++tick)}` }
 }
 
 describe('the catalogue collections', () => {
@@ -41,6 +41,28 @@ describe('the catalogue collections', () => {
     await seedIfEmpty(store)
 
     expect((await store.activities.get('free'))?.id).toBe('free')
+  })
+
+  it('seeds the shipped timestamps rather than stamping its own', async () => {
+    // The documented reason `put` keeps the envelope: two phones seeding
+    // independently have to agree about a row neither of them touched, and a
+    // seed-time clock would make every install disagree.
+    await seedIfEmpty(store)
+    const stored = await store.activities.get('free')
+    const shippedEntry = ACTIVITIES.find((activity) => activity.id === 'free')
+
+    expect(stored?.created_at).toBe(shippedEntry?.created_at)
+    expect(stored?.updated_at).toBe(shippedEntry?.updated_at)
+  })
+
+  it('stamps updated_at when a swimmer hides an entry', async () => {
+    // The exception has a boundary: `remove` is a user action, so the store owns
+    // the timestamp there as it does everywhere else.
+    await seedIfEmpty(store)
+    const before = await store.activities.get('corkscrew')
+    const hidden = await store.activities.remove('corkscrew')
+
+    expect(hidden.updated_at).toBeGreaterThan(before?.updated_at ?? 0)
   })
 
   it('writes nothing on a second run', async () => {
