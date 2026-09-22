@@ -6,410 +6,372 @@
  */
 /* eslint-disable */
 
+export type TermId = string;
+export type ActivityId = string;
+export type EquipmentId = string;
+export type EffortBandId = string;
+export type PatternId = string;
+export type StructureId = string;
+export type RecordMetaId = string;
+export type SwimmerId = string;
+export type TemplateId = string;
+export type SessionId = string;
+export type TestSetId = string;
+export type SettingsId = string;
+
+export type StrokeGroup = 'free' | 'back' | 'breast' | 'fly'
+
+export type PoolUnit = 'yards' | 'meters'
 /**
- * What the swimmer says afterwards. Not an effort band on a set.
- */
+* How hard a whole template is meant to be.
+*/
+export type Intensity = 'easy' | 'moderate' | 'hard'
+/**
+* What the swimmer says afterwards. Not an effort band on a set.
+*/
 export type EffortRating = 'too_easy' | 'about_right' | 'too_hard'
 /**
- * Youth swimmers only.
- */
+* Youth swimmers only.
+*/
 export type FunRating = 'up' | 'down'
+
+export type ActivityMode = 'swim' | 'kick' | 'pull' | 'drill'
 /**
- * One line of a template after parsing. Every variant keeps `raw`: unparseable lines are preserved verbatim and never lost, and keeping the original text on the parsed variants too means the workout view can always fall back to it.
- */
-export type ParsedLine = SetLine | MetaLine | UnparsedLine
+* How an activity can be measured. `either` means both — sculling is swum for a distance or held for a time, and the set decides which.
+*/
+export type ActivityExtentKind = 'distance' | 'time' | 'either'
 /**
- * `base+15`, `base-5`, `base`, or a literal clock time like `1:30`. Used both for a send-off and for a pace target, because a swimmer writes them the same way.
- */
-export type Interval = BaseInterval | LiteralInterval
+* Where a pattern applies. `build` is the reason this exists and is two different instructions: a bare "4x50 build" shapes each repetition, starting easy and finishing fast within the 50, while "4x50 build 1-4" shapes the set, each repetition faster than the one before it. Neither expresses the other.
+*/
+export type PatternScope = 'within_rep' | 'across_set'
+/**
+* Which pair of swims a base pace test recorded. Adults swim a 400 and a 200, youth a 200 and a 100, and the two compute base pace differently.
+*/
+export type TestProtocol = '400/200' | '200/100'
+
+
 /**
  * How much of a thing a set part is: a distance in pool units, or a duration. Never both — "20:00 free" knows its time and not its distance, and treading water has no distance at all.
  */
 export type Extent = Distance | Duration
+
+
 /**
- * Where a pattern applies. `build` is the reason this exists and is two different instructions: a bare "4x50 build" shapes each repetition, starting easy and finishing fast within the 50, while "4x50 build 1-4" shapes the set, each repetition faster than the one before it. Neither expresses the other.
+ * A distance in pool units. Always a positive multiple of 25.
  */
-export type PatternScope = 'within_rep' | 'across_set'
-export type PoolUnit = 'yards' | 'meters'
+export interface Distance {
+    readonly kind: 'distance',
+    readonly value: number,
+}
+
+
 /**
- * How hard a whole template is meant to be.
+ * A duration in seconds, taken as written rather than rounded.
  */
-export type Intensity = 'easy' | 'moderate' | 'hard'
+export interface Duration {
+    readonly kind: 'time',
+    readonly seconds: number,
+}
+
+
 /**
- * Which pair of swims a base pace test recorded. Adults swim a 400 and a 200, youth a 200 and a 100, and the two compute base pace differently.
+ * `base+15`, `base-5`, `base`, or a literal clock time like `1:30`. Used both for a send-off and for a pace target, because a swimmer writes them the same way.
  */
-export type TestProtocol = '400/200' | '200/100'
+export type Interval = BaseInterval | LiteralInterval
+
+
 /**
- * How an activity can be measured. `either` means both — sculling is swum for a distance or held for a time, and the set decides which.
+ * Relative to the swimmer's base pace for the relevant stroke group.
  */
-export type ActivityExtentKind = 'distance' | 'time' | 'either'
-export type ActivityMode = 'swim' | 'kick' | 'pull' | 'drill'
-export type StrokeGroup = 'free' | 'back' | 'breast' | 'fly'
+export interface BaseInterval {
+    readonly kind: 'base',
+    /** Seconds added to base pace. Zero for a bare `base`, negative for `base-5`. */
+    readonly offset_seconds: number,
+}
+
+
+/**
+ * An absolute time, read as written.
+ */
+export interface LiteralInterval {
+    readonly kind: 'literal',
+    readonly seconds: number,
+}
+
+
+/**
+ * A `{reps:MIN-MAX}` slot, resolved per swimmer from their load factor.
+ */
+export interface RepsSlot {
+    readonly min: number,
+    readonly max: number,
+}
+
+
+/**
+ * The repetitions a pattern spans — `descend 1-4` is 1 through 4.
+ */
+export interface RepRange {
+    readonly from: number,
+    readonly to: number,
+}
+
+
+/**
+ * A pattern as it applies to one set, resolved to a scope.
+ */
+export interface AppliedPattern {
+    /** Catalogue id. */
+    readonly id: string,
+    readonly scope: PatternScope,
+    /** Only ever set on an `across_set` pattern; repetitions are what it counts. */
+    readonly range?: RepRange,
+}
+
+
+/**
+ * One activity within a set. Most sets have exactly one part; a compound set like `25 drill / 50 swim` has several inside a single repetition.
+ */
+export interface SetPart {
+    readonly extent: Extent,
+    /** Catalogue id, when the descriptor named an activity we recognise. */
+    readonly activity?: string,
+    /** Catalogue ids, in the order the descriptor named them. Absent when none. */
+    readonly equipment?: readonly string[],
+    /** Catalogue id of the effort band, when the descriptor named one. */
+    readonly effort?: string,
+    /** The words naming the activity and its modifiers, verbatim. */
+    readonly descriptor: string,
+}
+
+
+/**
+ * One line of a template after parsing. Every variant keeps `raw`: unparseable lines are preserved verbatim and never lost, and keeping the original text on the parsed variants too means the workout view can always fall back to it.
+ */
+export type ParsedLine = SetLine | MetaLine | UnparsedLine
+
+
+/**
+ * A repetition count over one or more parts.
+ */
+export interface SetLine {
+    readonly kind: 'set',
+    /** A fixed count, or a `{reps:MIN-MAX}` slot resolved per swimmer. */
+    readonly reps: number | RepsSlot,
+    readonly parts: readonly [SetPart, ...SetPart[]],
+    /** When to leave: the send-off. */
+    readonly interval?: Interval,
+    /** How fast to swim it. Distinct from the interval — a swimmer can be given both, and "leave every 1:30" is a different instruction from "hold 1:20". */
+    readonly pace?: Interval,
+    /** A shape over the set. Scoped rather than a bare id, because the same word means different things at different scopes. */
+    readonly pattern?: AppliedPattern,
+    /** Catalogue id: how repetitions are shared out, when they are shared at all. */
+    readonly structure?: string,
+    /** Text after `#`. Displayed, never parsed. */
+    readonly note?: string,
+    readonly raw: string,
+}
+
+
+/**
+ * A `key: value` header field, from the block before the first section.
+ */
+export interface MetaLine {
+    readonly kind: 'meta',
+    readonly key: string,
+    readonly value: string,
+    readonly raw: string,
+}
+
+
+/**
+ * A line the grammar does not recognise, kept exactly as written.
+ */
+export interface UnparsedLine {
+    readonly kind: 'unparsed',
+    readonly raw: string,
+}
+
+
+/**
+ * A named block of a template: `warmup:`, `main:`, and so on.
+ */
+export interface ParsedSection {
+    readonly name: string,
+    /** The header line as written. Absent for the leading block, which has no header of its own and is where the template's metadata lives. */
+    readonly raw?: string,
+    readonly lines: readonly ParsedLine[],
+}
+
+
+/**
+ * What every catalogue entry has in common: a stable id, a display name, and the words a template author might actually write for it.
+ */
+export interface Term {
+    readonly id: string,
+    readonly name: string,
+    /** The words a template author might write for it. Matched normalised, so case and stray whitespace in a row a swimmer added do not stop it matching. */
+    readonly aliases: readonly [string, ...string[]],
+}
+
+
+/**
+ * What an activity is and how it is paced.
+ */
+export interface Activity extends Term {
+    /** A paced activity takes its send-off from the swimmer's base pace for the relevant stroke group. An unpaced one has none, and an interval on it is read literally. */
+    readonly paced: boolean,
+    /** Only ever set on a paced activity; an unpaced one has no base pace to look up. */
+    readonly stroke_group?: StrokeGroup,
+    readonly mode?: ActivityMode,
+    readonly extent_kind: ActivityExtentKind,
+}
+
+
+/**
+ * Something the swimmer holds or wears. Several can apply at once — fins and a snorkel is an ordinary thing to be asked for — so a part carries a list.
+ */
+export interface Equipment extends Term {
+    /** What holding it implies about how the swimmer is moving, where it implies anything. */
+    readonly implies_mode?: ActivityMode,
+}
+
+
+/**
+ * A qualitative effort band. Distinct from pace, which is always a number: "easy" is not a time, and no amount of arithmetic turns it into one.
+ */
+export interface EffortBand extends Term {
+    /** Ordering from easiest to hardest, so a selection rule can ask which of two sets is harder without parsing English. An ordering, never a pace — the gap between two ranks means nothing. */
+    readonly rank: number,
+}
+
+
+/**
+ * A shape over a set, or within each repetition of one.
+ */
+export interface Pattern extends Term {
+    /** The scopes this pattern can carry, the one it means by default first. */
+    readonly scopes: readonly [PatternScope, ...PatternScope[]],
+}
+
+
+/**
+ * How repetitions are distributed between swimmers, rather than what is swum.
+ */
+export interface Structure extends Term {
+    /** A relay is not a thing one swimmer can do alone. */
+    readonly min_swimmers: number,
+}
+
+
+/**
+ * Every stored record carries sync metadata from day one: deletes are soft, and both timestamps exist so a future backend can resolve conflicts.
+ */
+export interface RecordMeta {
+    readonly id: string,
+    readonly created_at: number,
+    readonly updated_at: number,
+    readonly deleted: boolean,
+}
+
+
+/**
+ * Free is always tested; the other strokes fall back to free plus a fixed offset.
+ */
+export interface BasePaceByStroke {
+    /** Sustainable seconds per 100, in the pool's unit. */
+    readonly free: number,
+    readonly back?: number,
+    readonly breast?: number,
+    readonly fly?: number,
+}
+
+
+
+export interface Swimmer extends RecordMeta {
+    readonly name: string,
+    readonly birth_year: number,
+    readonly base_pace_by_stroke: BasePaceByStroke,
+    /** Scales rep counts and send-offs. Clamped by the adaptation rules. */
+    readonly load_factor: number,
+    readonly is_youth: boolean,
+}
+
+
+
+export interface LevelRange {
+    readonly min: number,
+    readonly max: number,
+}
+
+
+/**
+ * An arrangement — named sections holding sets in order.
+ */
+export interface Template extends RecordMeta {
+    readonly name: string,
+    readonly tags: readonly string[],
+    readonly intensity: Intensity,
+    readonly level_range: LevelRange,
+    /** The template in swim shorthand. Authoritative; everything else is derived. */
+    readonly raw_text: string,
+    /** Cache of `raw_text` parsed by the template parser. */
+    readonly parsed_sets?: readonly ParsedSection[],
+}
+
+
+/**
+ * One swim. Swims are not measured: a session records how it felt, and the adaptation rules run off that.
+ */
+export interface Session extends RecordMeta {
+    readonly swimmer_id: string,
+    readonly template_id: string,
+    readonly date: number,
+    /** Filled by the resolver in step 5; absent until then. */
+    readonly resolved_sets?: readonly ParsedSection[],
+    /** Includes the easy-swim equivalent of any time-measured sets, so one number stays comparable week to week. */
+    readonly total_distance: number,
+    /** Absent until the swimmer rates the session. */
+    readonly effort_rating?: EffortRating,
+    /** Whether the main set was finished. Absent until the swimmer says. */
+    readonly completed?: boolean,
+    /** Youth swimmers only. */
+    readonly fun_rating?: FunRating,
+    readonly notes: string,
+}
+
+
+/**
+ * A base pace test.
+ */
+export interface TestSet extends RecordMeta {
+    readonly swimmer_id: string,
+    readonly date: number,
+    readonly protocol: TestProtocol,
+    /** Seconds for the longer swim: the 400, or the 200 under the youth protocol. */
+    readonly t400: number,
+    /** Seconds for the shorter swim: the 200, or the 100 under the youth protocol. */
+    readonly t200: number,
+    readonly computed_base_pace: number,
+}
+
+
+
+export interface Settings extends RecordMeta {
+    readonly pool_unit: PoolUnit,
+    readonly pool_length: number,
+}
+
 
 /**
  * The whole store, which is also the shape of the JSON export/import file. This is the schema's tree root, so the generated JSON Schema validates an import file directly.
  */
 export interface StoreSnapshot {
-  readonly sessions: readonly Session[]
-  readonly settings: Settings
-  readonly swimmers: readonly Swimmer[]
-  readonly templates: readonly Template[]
-  readonly test_sets: readonly TestSet[]
-  /**
-   * Bumped whenever a migration is added.
-   */
-  readonly version: number
-}
-/**
- * One swim. Swims are not measured: a session records how it felt, and the adaptation rules run off that.
- */
-export interface Session {
-  /**
-   * Whether the main set was finished. Absent until the swimmer says.
-   */
-  readonly completed?: boolean
-  readonly created_at: number
-  readonly date: number
-  readonly deleted: boolean
-  readonly effort_rating?: EffortRating
-  readonly fun_rating?: FunRating
-  readonly id: string
-  readonly notes: string
-  /**
-   * Filled by the resolver in step 5; absent until then.
-   */
-  readonly resolved_sets?: readonly ParsedSection[]
-  readonly swimmer_id: string
-  readonly template_id: string
-  /**
-   * Includes the easy-swim equivalent of any time-measured sets, so one number stays comparable week to week.
-   */
-  readonly total_distance: number
-  readonly updated_at: number
-}
-/**
- * A named block of a template: `warmup:`, `main:`, and so on.
- */
-export interface ParsedSection {
-  readonly lines: readonly ParsedLine[]
-  readonly name: string
-  /**
-   * The header line as written. Absent for the leading block, which has no header of its own and is where the template's metadata lives.
-   */
-  readonly raw?: string
-}
-/**
- * A repetition count over one or more parts.
- */
-export interface SetLine {
-  readonly interval?: Interval
-  readonly kind: 'set'
-  /**
-   * Text after `#`. Displayed, never parsed.
-   */
-  readonly note?: string
-  readonly pace?: Interval
-  /**
-   * @minItems 1
-   */
-  readonly parts: readonly [SetPart, ...SetPart[]]
-  /**
-   * A shape over the set. Scoped rather than a bare id, because the same word means different things at different scopes.
-   */
-  readonly pattern?: AppliedPattern
-  readonly raw: string
-  /**
-   * A fixed count, or a `{reps:MIN-MAX}` slot resolved per swimmer.
-   */
-  readonly reps: number | RepsSlot
-  /**
-   * Catalogue id: how repetitions are shared out, when they are shared at all.
-   */
-  readonly structure?: string
-}
-/**
- * Relative to the swimmer's base pace for the relevant stroke group.
- */
-export interface BaseInterval {
-  readonly kind: 'base'
-  /**
-   * Seconds added to base pace. Zero for a bare `base`, negative for `base-5`.
-   */
-  readonly offset_seconds: number
-}
-/**
- * An absolute time, read as written.
- */
-export interface LiteralInterval {
-  readonly kind: 'literal'
-  readonly seconds: number
-}
-/**
- * One activity within a set. Most sets have exactly one part; a compound set like `25 drill / 50 swim` has several inside a single repetition.
- */
-export interface SetPart {
-  /**
-   * Catalogue id, when the descriptor named an activity we recognise.
-   */
-  readonly activity?: string
-  /**
-   * The words naming the activity and its modifiers, verbatim.
-   */
-  readonly descriptor: string
-  /**
-   * Catalogue id of the effort band, when the descriptor named one.
-   */
-  readonly effort?: string
-  /**
-   * Catalogue ids, in the order the descriptor named them. Absent when none.
-   */
-  readonly equipment?: readonly string[]
-  readonly extent: Extent
-}
-/**
- * A distance in pool units. Always a positive multiple of 25.
- */
-export interface Distance {
-  readonly kind: 'distance'
-  readonly value: number
-}
-/**
- * A duration in seconds, taken as written rather than rounded.
- */
-export interface Duration {
-  readonly kind: 'time'
-  readonly seconds: number
-}
-/**
- * A pattern as it applies to one set, resolved to a scope.
- */
-export interface AppliedPattern {
-  /**
-   * Catalogue id.
-   */
-  readonly id: string
-  /**
-   * Only ever set on an `across_set` pattern; repetitions are what it counts.
-   */
-  readonly range?: RepRange
-  readonly scope: PatternScope
-}
-/**
- * The repetitions a pattern spans — `descend 1-4` is 1 through 4.
- */
-export interface RepRange {
-  readonly from: number
-  readonly to: number
-}
-/**
- * A `{reps:MIN-MAX}` slot, resolved per swimmer from their load factor.
- */
-export interface RepsSlot {
-  readonly max: number
-  readonly min: number
-}
-/**
- * A `key: value` header field, from the block before the first section.
- */
-export interface MetaLine {
-  readonly key: string
-  readonly kind: 'meta'
-  readonly raw: string
-  readonly value: string
-}
-/**
- * A line the grammar does not recognise, kept exactly as written.
- */
-export interface UnparsedLine {
-  readonly kind: 'unparsed'
-  readonly raw: string
-}
-export interface Settings {
-  readonly created_at: number
-  readonly deleted: boolean
-  readonly id: string
-  readonly pool_length: number
-  readonly pool_unit: PoolUnit
-  readonly updated_at: number
-}
-export interface Swimmer {
-  readonly base_pace_by_stroke: BasePaceByStroke
-  readonly birth_year: number
-  readonly created_at: number
-  readonly deleted: boolean
-  readonly id: string
-  readonly is_youth: boolean
-  /**
-   * Scales rep counts and send-offs. Clamped by the adaptation rules.
-   */
-  readonly load_factor: number
-  readonly name: string
-  readonly updated_at: number
-}
-/**
- * Free is always tested; the other strokes fall back to free plus a fixed offset.
- */
-export interface BasePaceByStroke {
-  readonly back?: number
-  readonly breast?: number
-  readonly fly?: number
-  /**
-   * Sustainable seconds per 100, in the pool's unit.
-   */
-  readonly free: number
-}
-/**
- * An arrangement — named sections holding sets in order.
- */
-export interface Template {
-  readonly created_at: number
-  readonly deleted: boolean
-  readonly id: string
-  readonly intensity: Intensity
-  readonly level_range: LevelRange
-  readonly name: string
-  /**
-   * Cache of `raw_text` parsed by the template parser.
-   */
-  readonly parsed_sets?: readonly ParsedSection[]
-  /**
-   * The template in swim shorthand. Authoritative; everything else is derived.
-   */
-  readonly raw_text: string
-  readonly tags: readonly string[]
-  readonly updated_at: number
-}
-export interface LevelRange {
-  readonly max: number
-  readonly min: number
-}
-/**
- * A base pace test.
- */
-export interface TestSet {
-  readonly computed_base_pace: number
-  readonly created_at: number
-  readonly date: number
-  readonly deleted: boolean
-  readonly id: string
-  readonly protocol: TestProtocol
-  readonly swimmer_id: string
-  /**
-   * Seconds for the shorter swim: the 200, or the 100 under the youth protocol.
-   */
-  readonly t200: number
-  /**
-   * Seconds for the longer swim: the 400, or the 200 under the youth protocol.
-   */
-  readonly t400: number
-  readonly updated_at: number
-}
-/**
- * What an activity is and how it is paced.
- */
-export interface Activity {
-  /**
-   * The words a template author might write for it. Matched normalised, so case and stray whitespace in a row a swimmer added do not stop it matching.
-   *
-   * @minItems 1
-   */
-  readonly aliases: readonly [string, ...string[]]
-  readonly extent_kind: ActivityExtentKind
-  readonly id: string
-  readonly mode?: ActivityMode
-  readonly name: string
-  /**
-   * A paced activity takes its send-off from the swimmer's base pace for the relevant stroke group. An unpaced one has none, and an interval on it is read literally.
-   */
-  readonly paced: boolean
-  readonly stroke_group?: StrokeGroup
-}
-/**
- * A qualitative effort band. Distinct from pace, which is always a number: "easy" is not a time, and no amount of arithmetic turns it into one.
- */
-export interface EffortBand {
-  /**
-   * The words a template author might write for it. Matched normalised, so case and stray whitespace in a row a swimmer added do not stop it matching.
-   *
-   * @minItems 1
-   */
-  readonly aliases: readonly [string, ...string[]]
-  readonly id: string
-  readonly name: string
-  /**
-   * Ordering from easiest to hardest, so a selection rule can ask which of two sets is harder without parsing English. An ordering, never a pace — the gap between two ranks means nothing.
-   */
-  readonly rank: number
-}
-/**
- * Something the swimmer holds or wears. Several can apply at once — fins and a snorkel is an ordinary thing to be asked for — so a part carries a list.
- */
-export interface Equipment {
-  /**
-   * The words a template author might write for it. Matched normalised, so case and stray whitespace in a row a swimmer added do not stop it matching.
-   *
-   * @minItems 1
-   */
-  readonly aliases: readonly [string, ...string[]]
-  readonly id: string
-  readonly implies_mode?: ActivityMode
-  readonly name: string
-}
-/**
- * A shape over a set, or within each repetition of one.
- */
-export interface Pattern {
-  /**
-   * The words a template author might write for it. Matched normalised, so case and stray whitespace in a row a swimmer added do not stop it matching.
-   *
-   * @minItems 1
-   */
-  readonly aliases: readonly [string, ...string[]]
-  readonly id: string
-  readonly name: string
-  /**
-   * The scopes this pattern can carry, the one it means by default first.
-   *
-   * @minItems 1
-   */
-  readonly scopes: readonly [PatternScope, ...PatternScope[]]
-}
-/**
- * Every stored record carries sync metadata from day one: deletes are soft, and both timestamps exist so a future backend can resolve conflicts.
- */
-export interface RecordMeta {
-  readonly created_at: number
-  readonly deleted: boolean
-  readonly id: string
-  readonly updated_at: number
-}
-/**
- * How repetitions are distributed between swimmers, rather than what is swum.
- */
-export interface Structure {
-  /**
-   * The words a template author might write for it. Matched normalised, so case and stray whitespace in a row a swimmer added do not stop it matching.
-   *
-   * @minItems 1
-   */
-  readonly aliases: readonly [string, ...string[]]
-  readonly id: string
-  /**
-   * A relay is not a thing one swimmer can do alone.
-   */
-  readonly min_swimmers: number
-  readonly name: string
-}
-/**
- * What every catalogue entry has in common: a stable id, a display name, and the words a template author might actually write for it.
- */
-export interface Term {
-  /**
-   * The words a template author might write for it. Matched normalised, so case and stray whitespace in a row a swimmer added do not stop it matching.
-   *
-   * @minItems 1
-   */
-  readonly aliases: readonly [string, ...string[]]
-  readonly id: string
-  readonly name: string
+    /** Bumped whenever a migration is added. */
+    readonly version: number,
+    readonly swimmers: readonly Swimmer[],
+    readonly templates: readonly Template[],
+    readonly sessions: readonly Session[],
+    readonly test_sets: readonly TestSet[],
+    readonly settings: Settings,
 }

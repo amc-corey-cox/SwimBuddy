@@ -29,7 +29,8 @@
           "type": "boolean"
         },
         "stroke_group": {
-          "$ref": "#/$defs/StrokeGroup"
+          "$ref": "#/$defs/StrokeGroup",
+          "description": "Only ever set on a paced activity; an unpaced one has no base pace to look up."
         }
       },
       "required": [
@@ -249,7 +250,8 @@
           "type": "string"
         },
         "implies_mode": {
-          "$ref": "#/$defs/ActivityMode"
+          "$ref": "#/$defs/ActivityMode",
+          "description": "What holding it implies about how the swimmer is moving, where it implies anything."
         },
         "name": {
           "type": "string"
@@ -264,16 +266,10 @@
       "type": "object"
     },
     "Extent": {
-      "title": "Extent",
+      "additionalProperties": false,
       "description": "How much of a thing a set part is: a distance in pool units, or a duration. Never both — \"20:00 free\" knows its time and not its distance, and treading water has no distance at all.",
-      "anyOf": [
-        {
-          "$ref": "#/$defs/Distance"
-        },
-        {
-          "$ref": "#/$defs/Duration"
-        }
-      ]
+      "title": "Extent",
+      "type": "object"
     },
     "FunRating": {
       "description": "Youth swimmers only.",
@@ -295,16 +291,10 @@
       "type": "string"
     },
     "Interval": {
-      "title": "Interval",
+      "additionalProperties": false,
       "description": "`base+15`, `base-5`, `base`, or a literal clock time like `1:30`. Used both for a send-off and for a pace target, because a swimmer writes them the same way.",
-      "anyOf": [
-        {
-          "$ref": "#/$defs/BaseInterval"
-        },
-        {
-          "$ref": "#/$defs/LiteralInterval"
-        }
-      ]
+      "title": "Interval",
+      "type": "object"
     },
     "LevelRange": {
       "additionalProperties": false,
@@ -372,19 +362,10 @@
       "type": "object"
     },
     "ParsedLine": {
-      "title": "ParsedLine",
+      "additionalProperties": false,
       "description": "One line of a template after parsing. Every variant keeps `raw`: unparseable lines are preserved verbatim and never lost, and keeping the original text on the parsed variants too means the workout view can always fall back to it.",
-      "anyOf": [
-        {
-          "$ref": "#/$defs/SetLine"
-        },
-        {
-          "$ref": "#/$defs/MetaLine"
-        },
-        {
-          "$ref": "#/$defs/UnparsedLine"
-        }
-      ]
+      "title": "ParsedLine",
+      "type": "object"
     },
     "ParsedSection": {
       "additionalProperties": false,
@@ -392,7 +373,17 @@
       "properties": {
         "lines": {
           "items": {
-            "$ref": "#/$defs/ParsedLine"
+            "anyOf": [
+              {
+                "$ref": "#/$defs/SetLine"
+              },
+              {
+                "$ref": "#/$defs/MetaLine"
+              },
+              {
+                "$ref": "#/$defs/UnparsedLine"
+              }
+            ]
           },
           "type": "array"
         },
@@ -555,10 +546,12 @@
           "type": "boolean"
         },
         "effort_rating": {
-          "$ref": "#/$defs/EffortRating"
+          "$ref": "#/$defs/EffortRating",
+          "description": "Absent until the swimmer rates the session."
         },
         "fun_rating": {
-          "$ref": "#/$defs/FunRating"
+          "$ref": "#/$defs/FunRating",
+          "description": "Youth swimmers only."
         },
         "id": {
           "type": "string"
@@ -609,7 +602,18 @@
       "description": "A repetition count over one or more parts.",
       "properties": {
         "interval": {
-          "$ref": "#/$defs/Interval"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BaseInterval"
+            },
+            {
+              "$ref": "#/$defs/LiteralInterval"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "When to leave: the send-off."
         },
         "kind": {
           "const": "set",
@@ -623,7 +627,18 @@
           ]
         },
         "pace": {
-          "$ref": "#/$defs/Interval"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BaseInterval"
+            },
+            {
+              "$ref": "#/$defs/LiteralInterval"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "How fast to swim it. Distinct from the interval — a swimmer can be given both, and \"leave every 1:30\" is a different instruction from \"hold 1:20\"."
         },
         "parts": {
           "items": {
@@ -707,7 +722,14 @@
           ]
         },
         "extent": {
-          "$ref": "#/$defs/Extent"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Distance"
+            },
+            {
+              "$ref": "#/$defs/Duration"
+            }
+          ]
         }
       },
       "required": [

@@ -29,15 +29,16 @@ because they need a Chromium install that CI provides and a fresh checkout does 
 
 Individual gates:
 
-| Command                 | What it checks                                          |
-| ----------------------- | ------------------------------------------------------- |
-| `npm run lint`          | ESLint, including the `src/core/` purity rules          |
-| `npm run format:check`  | Prettier (`npm run format` fixes)                       |
-| `npm run typecheck`     | `tsc -b` across the app, build-tooling and e2e projects |
-| `npm run test:coverage` | Unit tests with coverage thresholds                     |
-| `npm run test:e2e`      | Playwright smoke tests against the real built page      |
-| `npm run check:bundle`  | Asserts no fixture data reached the production bundle   |
-| `npm run schema:gen`    | Regenerates the model from `schema/swimbuddy.yaml`      |
+| Command                 | What it checks                                            |
+| ----------------------- | --------------------------------------------------------- |
+| `npm run lint`          | ESLint, including the `src/core/` purity rules            |
+| `npm run format:check`  | Prettier (`npm run format` fixes)                         |
+| `npm run typecheck`     | `tsc -b` across the app, build-tooling and e2e projects   |
+| `npm run test:coverage` | Unit tests with coverage thresholds                       |
+| `npm run test:e2e`      | Playwright smoke tests against the real built page        |
+| `npm run check:bundle`  | Asserts no fixture data reached the production bundle     |
+| `npm run schema:setup`  | Builds the LinkML toolchain and applies `schema/patches/` |
+| `npm run schema:gen`    | Regenerates the model from `schema/swimbuddy.yaml`        |
 
 All rule-based logic lives in `src/core/` as pure functions and must be covered by
 tests runnable with `npm test` — development happens in a cloud sandbox with no device

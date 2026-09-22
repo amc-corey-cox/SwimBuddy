@@ -52,7 +52,9 @@ convention, so it needs attention in review.
 
 LinkML is a Python tool and is deliberately not an npm dependency. Nothing in CI, the
 app build or `npm test` may need it: development happens on a phone, and the committed
-generated output is what everything else reads.
+generated output is what everything else reads. `npm run schema:setup` builds it and
+applies `schema/patches/`, which carry a gen-typescript fix that has gone upstream and
+is not released yet; `schema:gen` refuses to run without them.
 
 ## Testing notes
 

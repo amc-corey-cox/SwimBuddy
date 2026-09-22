@@ -3,15 +3,21 @@
 `swimbuddy.yaml` is a [LinkML](https://linkml.io/) schema and it is the source of
 truth for the data model. Two files are generated from it and committed:
 
-- `swimbuddy.schema.json` — JSON Schema, used to validate an import file and the
-  fixture store.
-- `../src/core/model.ts` — the TypeScript types the app is written against.
+- `swimbuddy.schema.json` — JSON Schema, from `gen-json-schema`, used to validate an
+  import file and the fixture store.
+- `../src/core/model.ts` — the TypeScript types the app is written against, from
+  `gen-typescript`.
+
+They are two generators over the same schema, not one derived from the other.
+Generating types out of the JSON Schema means inheriting its bugs, and loses
+`extends` and the per-property documentation on the way.
 
 Neither is edited by hand. Change the model by changing the schema.
 
 ## Regenerating
 
 ```
+npm run schema:setup   # once per sandbox
 npm run schema:gen
 ```
 
@@ -19,24 +25,32 @@ LinkML is a Python tool and is deliberately not an npm dependency: development
 happens on a phone, and nothing in CI, the app build or `npm test` should need a
 200MB toolchain to run. The committed output is what everything else reads.
 
-One-time setup, in a sandbox that has Python:
+`schema:setup` builds `.linkml/` and applies everything in `patches/`. It is
+idempotent. `.linkml/` is gitignored; point `LINKML_BIN` at another install if you
+keep one elsewhere, and `LINKML_VENV` to build it somewhere else.
 
-```
-python3 -m venv .linkml
-.linkml/bin/pip install linkml
-```
+## The patches
 
-`.linkml/` is gitignored. Point `LINKML_BIN` at another install if you keep one
-elsewhere.
+`gen-typescript` in released LinkML types every enum-ranged slot as `string`,
+ignores `equals_string`, and ignores `any_of` — so enums come out emitted but
+unreferenced, and discriminated unions are not expressible. `patches/` carries the
+fix; it has been sent upstream and these files go away when it lands.
+
+`schema:gen` refuses to run against an unpatched LinkML. That check exists because
+the failure is the quiet kind: the output still compiles and mostly works, it is
+just wrong about every enum.
 
 ## Why the schema is written the way it is
 
 Three things in here look odd and are load-bearing. Each was arrived at by
 generating the output and reading it.
 
-**No `default_range`.** An implicit string range emits `"type": "string"` alongside
-a union's `anyOf`, which generates `(A | B) & string` — quietly `never`. Every slot
-names its own range, and a slot with `any_of` names none at all.
+**No `default_range`, and no `range` on a slot with `any_of`.** Two versions of one
+trap. An implicit string range emits `"type": "string"` beside a union's `anyOf`,
+generating `(A | B) & string` — quietly `never`. Naming the abstract parent as the
+range emits `{"$ref": parent, "anyOf": [...]}`, and since both apply and the parent
+is an empty closed object, _nothing validates_. A slot with `any_of` names no range
+at all; the alternatives are the range.
 
 **Unions are an abstract parent with `is_a` children.** `Extent`, `Interval` and
 `ParsedLine` are each an empty abstract class whose children pin a `kind` with
@@ -50,12 +64,19 @@ in JSON Schema and a non-empty tuple in TypeScript, which is what lets
 
 ## What generation cannot carry
 
-`scripts/generate-model.mjs` fixes four things up, each because JSON Schema or the
-TypeScript generator cannot say what the schema means. They are documented in that
-file and in `scripts/harden-generated-types.mjs`, and both are unit tested:
-`readonly`, absent-rather-than-null optionals, index signatures, and naming the
-unions so `Interval` stays one type rather than three copies.
+`scripts/harden-generated-types.mjs` applies four rules to the generated
+TypeScript, each closing a gap between what the schema means and what
+`gen-typescript` can currently say. All four are unit tested.
 
-A property description written next to a `$ref` is dropped from the generated types
-— it would make the generator emit a duplicate type per description. The prose is
-still here, in this directory, which is the file to read anyway.
+`export enum` becomes a string-literal union, because TypeScript string enums are
+nominal — `stroke_group: 'free'` does not type-check against one, and every fixture
+here writes the string. A union also emits no runtime JavaScript, which matters for
+a PWA and is required under `--erasableSyntaxOnly`.
+
+An abstract parent standing for a union becomes a union alias and its children stop
+extending it, since an empty `ParsedLine` interface has no `kind` to narrow on.
+Properties become `readonly`. A list the schema says may not be empty becomes a
+non-empty tuple, so `scopes[0]` is a value rather than possibly undefined.
+
+The first two would be reasonable options upstream. The other two are this
+codebase's house style rather than anything LinkML got wrong.

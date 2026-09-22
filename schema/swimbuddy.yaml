@@ -224,7 +224,6 @@ classes:
       `25 drill / 50 swim` has several inside a single repetition.
     attributes:
       extent:
-        range: Extent
         required: true
         inlined: true
         any_of:
@@ -280,7 +279,6 @@ classes:
           - range: BaseInterval
           - range: LiteralInterval
       pace:
-        range: Interval
         inlined: true
         description: >-
           How fast to swim it. Distinct from the interval — a swimmer can be given
@@ -346,7 +344,6 @@ classes:
           The header line as written. Absent for the leading block, which has no
           header of its own and is where the template's metadata lives.
       lines:
-        range: ParsedLine
         required: true
         multivalued: true
         inlined_as_list: true

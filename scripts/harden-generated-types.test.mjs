@@ -1,100 +1,125 @@
 import { describe, expect, it } from 'vitest'
 import { hardenGeneratedTypes } from './harden-generated-types.mjs'
 
-/** Indented like the generator's output, so the property regex sees what it will see. */
-function iface(...properties) {
-  return ['export interface T {', ...properties.map((line) => `  ${line}`), '}'].join('\n')
+const SHAPES = {
+  unions: new Map([['Extent', ['Distance', 'Duration']]]),
+  nonEmptyLists: new Map([['T', new Set(['parts'])]]),
 }
+
+const NONE = { unions: new Map(), nonEmptyLists: new Map() }
+
+/** Indented like gen-typescript's output, so the property regex sees what it will see. */
+function iface(...properties) {
+  return ['export interface T {', ...properties.map((line) => `    ${line}`), '}'].join('\n')
+}
+
+function harden(source, shapes = NONE) {
+  return hardenGeneratedTypes(source, shapes)
+}
+
+describe('enums', () => {
+  it('becomes a string-literal union, because string enums are nominal', () => {
+    // `stroke_group: 'free'` is an error against a TS string enum, and every
+    // fixture in this repo writes the string.
+    const source = [
+      'export enum PoolUnit {',
+      '    yards = "yards",',
+      '    meters = "meters",',
+      '};',
+    ].join('\n')
+
+    expect(harden(source)).toBe("export type PoolUnit = 'yards' | 'meters'")
+  })
+
+  it('keeps a value whose member name differs from it', () => {
+    const source = ['export enum P {', '    number_400_200 = "400/200",', '};'].join('\n')
+
+    expect(harden(source)).toBe("export type P = '400/200'")
+  })
+
+  it('leaves an enum it cannot read alone rather than dropping values', () => {
+    const source = ['export enum Weird {', '    computed = someCall(),', '};'].join('\n')
+
+    expect(harden(source)).toBe(source)
+  })
+})
+
+describe('union parents', () => {
+  it('turns an empty abstract parent into a union alias', () => {
+    expect(harden('export interface Extent {\n}', SHAPES)).toBe(
+      'export type Extent = Distance | Duration',
+    )
+  })
+
+  it('stops the children extending what is no longer an interface', () => {
+    const source = [
+      'export interface Extent {',
+      '}',
+      '',
+      'export interface Distance extends Extent {',
+      '}',
+    ].join('\n')
+
+    expect(harden(source, SHAPES)).toContain('export interface Distance {')
+  })
+
+  it('leaves a parent that is not a union extending normally', () => {
+    const source = 'export interface Swimmer extends RecordMeta {\n}'
+
+    expect(harden(source, SHAPES)).toBe(source)
+  })
+
+  it('puts the union name back where the generator spelled out its members', () => {
+    expect(harden(iface('extent: Distance | Duration,'), SHAPES)).toBe(
+      iface('readonly extent: Extent,'),
+    )
+  })
+
+  it('names a union inside an array too', () => {
+    expect(harden(iface('all: (Distance | Duration)[],'), SHAPES)).toBe(
+      iface('readonly all: readonly Extent[],'),
+    )
+  })
+})
 
 describe('readonly', () => {
   it('marks every property readonly', () => {
-    expect(hardenGeneratedTypes(iface('name: string'))).toBe(iface('readonly name: string'))
+    expect(harden(iface('name: string,'))).toBe(iface('readonly name: string,'))
   })
 
   it('marks arrays readonly as well as the property holding them', () => {
-    expect(hardenGeneratedTypes(iface('tags: string[]'))).toBe(
-      iface('readonly tags: readonly string[]'),
-    )
-  })
-
-  it('marks a tuple readonly, which is how a minimum_cardinality list arrives', () => {
-    expect(hardenGeneratedTypes(iface('parts: [SetPart, ...SetPart[]]'))).toBe(
-      iface('readonly parts: readonly [SetPart, ...SetPart[]]'),
-    )
-  })
-
-  it('marks an array inside a union readonly', () => {
-    expect(hardenGeneratedTypes(iface('either: string[] | number[]'))).toBe(
-      iface('readonly either: readonly string[] | readonly number[]'),
-    )
+    expect(harden(iface('tags: string[],'))).toBe(iface('readonly tags: readonly string[],'))
   })
 
   it('leaves a property that is already readonly alone', () => {
-    expect(hardenGeneratedTypes(iface('readonly name: string'))).toBe(
-      iface('readonly name: string'),
-    )
+    expect(harden(iface('readonly name: string,'))).toBe(iface('readonly name: string,'))
   })
 
   it('does not touch lines that are not properties', () => {
-    const source = 'export type Extent = Distance | Duration'
-    expect(hardenGeneratedTypes(source)).toBe(source)
+    expect(harden('export type X = string')).toBe('export type X = string')
+  })
+
+  it('keeps an optional marker', () => {
+    expect(harden(iface('note?: string,'))).toBe(iface('readonly note?: string,'))
   })
 })
 
-describe('null', () => {
-  it('drops a trailing null from an optional property', () => {
-    expect(hardenGeneratedTypes(iface('note?: string | null'))).toBe(
-      iface('readonly note?: string'),
+describe('non-empty lists', () => {
+  it('becomes a tuple, so the first element is a value rather than undefined', () => {
+    expect(harden(iface('parts: SetPart[],'), SHAPES)).toBe(
+      iface('readonly parts: readonly [SetPart, ...SetPart[]],'),
     )
   })
 
-  it('keeps the rest of a union when the null goes', () => {
-    expect(hardenGeneratedTypes(iface('u?: A | B | null'))).toBe(iface('readonly u?: A | B'))
-  })
-
-  it('leaves a required property alone', () => {
-    // A required nullable slot means the null is the model talking, not LinkML
-    // padding an optional, so it is not this transform's to remove.
-    expect(hardenGeneratedTypes(iface('raw: string | null'))).toBe(
-      iface('readonly raw: string | null'),
-    )
-  })
-})
-
-describe('noise', () => {
-  it('drops an index signature', () => {
-    expect(hardenGeneratedTypes(iface('name: string', '[k: string]: unknown'))).toBe(
-      iface('readonly name: string'),
+  it('leaves a list with no stated minimum as an array', () => {
+    expect(harden(iface('tags: string[],'), SHAPES)).toBe(
+      iface('readonly tags: readonly string[],'),
     )
   })
 
-  it('drops the generator chatter but keeps the prose above it', () => {
-    const source = [
-      '/**',
-      ' * Real documentation.',
-      ' *',
-      " * This interface was referenced by `StoreSnapshot`'s JSON-Schema",
-      ' * via the `definition` "Extent".',
-      ' */',
-      'export type Extent = Distance | Duration',
-    ].join('\n')
+  it('only applies to the interface that declares the slot', () => {
+    const other = ['export interface Other {', '    parts: SetPart[],', '}'].join('\n')
 
-    expect(hardenGeneratedTypes(source)).toBe(
-      ['/**', ' * Real documentation.', ' */', 'export type Extent = Distance | Duration'].join(
-        '\n',
-      ),
-    )
-  })
-
-  it('drops a comment left with nothing in it', () => {
-    const source = [
-      '/**',
-      " * This interface was referenced by `StoreSnapshot`'s JSON-Schema",
-      ' * via the `definition` "PoolUnit".',
-      ' */',
-      "export type PoolUnit = 'yards'",
-    ].join('\n')
-
-    expect(hardenGeneratedTypes(source)).toBe("export type PoolUnit = 'yards'")
+    expect(harden(other, SHAPES)).toContain('readonly parts: readonly SetPart[],')
   })
 })

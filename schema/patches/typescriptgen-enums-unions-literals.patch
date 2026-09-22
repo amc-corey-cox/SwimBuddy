@@ -1,0 +1,51 @@
+--- linkml/generators/typescriptgen.py.orig
++++ linkml/generators/typescriptgen.py
+@@ -185,6 +185,20 @@
+                     return s
+             return None
+ 
++    def range_name(self, r: str) -> str:
++        sv = self.schemaview
++        if r in sv.all_enums():
++            return self.name(sv.get_enum(r))
++        if r in sv.all_classes():
++            return self.name(sv.get_class(r))
++        if r in sv.all_types():
++            t = sv.get_type(r)
++            if t.base and t.base in type_map:
++                return type_map[t.base]
++            if t.typeof and t.typeof in type_map:
++                return type_map[t.typeof]
++        return "string"
++
+     def range(self, slot: SlotDefinition) -> str:
+         sv = self.schemaview
+         r = slot.range
+@@ -197,6 +211,27 @@
+                     return f"({subproperty_type})[]"
+                 return subproperty_type
+ 
++        # A union of class ranges is the only way to write a discriminated union in
++        # LinkML, and it was being ignored entirely — the slot came back as the
++        # abstract parent, which is an empty interface and discriminates nothing.
++        if slot.any_of:
++            members = [self.range_name(m.range) for m in slot.any_of if m.range]
++            if len(members) == len(slot.any_of) and members:
++                union = " | ".join(dict.fromkeys(members))
++                return f"({union})[]" if slot.multivalued else union
++
++        # An enum range fell through to the final `return "string"`, so every
++        # enum-typed slot was typed `string` while the enum itself was emitted
++        # and referenced by nothing.
++        if r in sv.all_enums():
++            e_name = self.name(sv.get_enum(r))
++            return f"{e_name}[]" if slot.multivalued else e_name
++
++        # A slot pinned to one value is a discriminant; a literal type is what
++        # makes a union of such classes discriminable.
++        if slot.equals_string is not None:
++            return f"'{slot.equals_string}'"
++
+         if r in sv.all_classes():
+             rc = sv.get_class(r)
+             rc_ref = self.classref(rc)
