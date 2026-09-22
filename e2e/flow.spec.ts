@@ -117,6 +117,26 @@ test('the app still works with the network off', async ({ page, context }) => {
   await context.setOffline(false)
 })
 
+test('every icon the manifest names is available offline', async ({ page, context }) => {
+  // A manifest that points at an uncached icon installs fine online and then
+  // cannot paint its own launcher tile at the pool.
+  await page.goto('/SwimBuddy/')
+  await page.waitForFunction(() => navigator.serviceWorker.controller !== null)
+
+  const icons = await page.evaluate(async () => {
+    const href = document.querySelector('link[rel="manifest"]')?.getAttribute('href') ?? ''
+    const manifest = (await (await fetch(href)).json()) as { icons: { src: string }[] }
+    return manifest.icons.map((icon) => icon.src)
+  })
+
+  await context.setOffline(true)
+  for (const icon of icons) {
+    const status = await page.evaluate(async (src: string) => (await fetch(src)).status, icon)
+    expect(status).toBe(200)
+  }
+  await context.setOffline(false)
+})
+
 test('it is installable', async ({ page }) => {
   await page.goto('/SwimBuddy/')
 
