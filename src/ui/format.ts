@@ -1,3 +1,5 @@
+import type { SetPart } from '../core/types'
+
 /**
  * Turning model numbers into what goes on a wet phone at arm's length.
  *
@@ -22,12 +24,15 @@ export function repetitions(reps: number, extent: string): string {
   return reps === 1 ? extent : `${String(reps)}×${extent}`
 }
 
-/** A distance in pool units, or a duration — whichever the part is measured in. */
-export function extent(part: {
-  extent: { kind: string; value?: number; seconds?: number }
-}): string {
-  if (part.extent.kind === 'distance') return String(part.extent.value ?? 0)
-  return clock(part.extent.seconds ?? 0)
+/**
+ * A distance in pool units, or a duration — whichever the part is measured in.
+ *
+ * Takes the real `SetPart` rather than a structural stand-in, so the discriminant
+ * narrows and there is no missing-field case to invent a zero for. A zero here
+ * would render as a plausible number and hide the bug that produced it.
+ */
+export function extent(part: SetPart): string {
+  return part.extent.kind === 'distance' ? String(part.extent.value) : clock(part.extent.seconds)
 }
 
 /** `1,250 yards`, with the unit the pool is actually measured in. */

@@ -18,6 +18,14 @@ Every record carries the sync envelope from the spec: a client-generated UUIDv4,
 store owns all four — callers pass only the meaningful fields, and a patch
 cannot overwrite identity or bookkeeping.
 
+`put()` is the deliberate exception, and exists for exactly two callers: seeding
+and import. Both are cases where the envelope _is_ the data. A shipped catalogue
+entry carries a fixed `created_at` so that two phones seeding independently agree
+about a row neither of them touched, and an imported record has to come back with
+the timestamps it was exported with or a future sync would treat every import as
+an edit. `create()` and `update()` remain the only way a user action writes, and
+they still own the envelope.
+
 Deletes are soft. `remove()` flags the row and leaves it in place so a future
 sync can propagate the deletion; reads hide tombstones unless asked for them
 with `{ includeDeleted: true }`. `purge()` is the hard delete, and exists for

@@ -59,6 +59,16 @@ export async function startApp(options: AppOptions): Promise<void> {
   let screen: Screen = { name: 'home' }
   let wakeLock: WakeLock | undefined
 
+  /**
+   * Which render is the current one.
+   *
+   * `render` awaits storage before it touches the DOM, so two navigations in
+   * quick succession — tapping 45 then 60 before the first read comes back —
+   * would otherwise both append, and the slower one would win. Every render
+   * takes a ticket and stands down if a newer one has been issued since.
+   */
+  let renderToken = 0
+
   function releaseWakeLock(): void {
     wakeLock?.release()
     wakeLock = undefined
@@ -92,9 +102,11 @@ export async function startApp(options: AppOptions): Promise<void> {
   }
 
   async function render(): Promise<void> {
+    const token = ++renderToken
+    const current = screen
     clear(mount)
 
-    if (screen.name === 'home') {
+    if (current.name === 'home') {
       mount.append(
         homeScreen(swimmers, (swimmer) => {
           go({ name: 'pre-swim', swimmer, minutes: DEFAULT_MINUTES })
@@ -103,9 +115,10 @@ export async function startApp(options: AppOptions): Promise<void> {
       return
     }
 
-    if (screen.name === 'pre-swim') {
-      const { swimmer, minutes } = screen
+    if (current.name === 'pre-swim') {
+      const { swimmer, minutes } = current
       const { selection, adaptation } = await planFor(swimmer, minutes)
+      if (token !== renderToken) return
 
       mount.append(
         preSwimScreen(swimmer, minutes, selection, adaptation.reasons, {
@@ -135,8 +148,8 @@ export async function startApp(options: AppOptions): Promise<void> {
       return
     }
 
-    if (screen.name === 'workout') {
-      const { swimmer, workout, index } = screen
+    if (current.name === 'workout') {
+      const { swimmer, workout, index } = current
       wakeLock ??= keepScreenAwake()
 
       mount.append(
@@ -152,7 +165,7 @@ export async function startApp(options: AppOptions): Promise<void> {
       return
     }
 
-    const { swimmer, workout } = screen
+    const { swimmer, workout } = current
     mount.append(
       el('p', { class: 'muted', 'data-testid': 'swum' }, [
         distance(workout.total_distance, settings.pool_unit),

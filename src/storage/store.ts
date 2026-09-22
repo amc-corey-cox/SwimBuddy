@@ -76,7 +76,9 @@ export interface TestSetCollection extends Collection<TestSet> {
 export interface CatalogueCollection<T extends Term> {
   list(this: void, options?: ReadOptions): Promise<T[]>
   get(this: void, id: string, options?: ReadOptions): Promise<T | undefined>
+  /** Whole-record write, envelope included — see `Collection.put`. */
   put(this: void, entry: T): Promise<T>
+  /** Soft delete, and the one write here where the store does stamp `updated_at`. */
   remove(this: void, id: string): Promise<T>
 }
 

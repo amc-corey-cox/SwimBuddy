@@ -12,7 +12,13 @@ import type { Plugin } from 'vite'
  */
 
 /** Files copied from public/ that the app needs offline. */
-const STATIC_ASSETS = ['favicon.svg', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png']
+const STATIC_ASSETS = [
+  'favicon.svg',
+  'manifest.webmanifest',
+  'icon-192.png',
+  'icon-512.png',
+  'icon-512-maskable.png',
+]
 
 export function serviceWorkerPlugin({ base = '/' }: { base?: string } = {}): Plugin {
   return {
@@ -32,7 +38,7 @@ export function serviceWorkerPlugin({ base = '/' }: { base?: string } = {}): Plu
 }
 
 function source(urls: string[]): string {
-  return `/* Generated at build time — see scripts/service-worker-plugin.mjs. */
+  return `/* Generated at build time — see scripts/service-worker-plugin.ts. */
 const CACHE = 'swim-buddy-${Date.now().toString(36)}'
 const PRECACHE = ${JSON.stringify([...new Set(urls)], null, 2)}
 
