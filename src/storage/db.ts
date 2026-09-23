@@ -64,7 +64,7 @@ export function onDeleteBlocked(): void {
  * Deletes the database outright, so the next open starts from nothing.
  *
  * There is no export yet, so this is irreversible and the only undo is that
- * seeding puts the household back. The caller must close its store first:
+ * seeding puts the roster back. The caller must close its store first:
  * IndexedDB will not delete a database that still has an open connection, and
  * a blocked delete does not fail, it simply never completes — which on a phone
  * is indistinguishable from the app having hung.

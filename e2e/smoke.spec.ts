@@ -46,7 +46,7 @@ test('every page links to the source, as AGPL section 13 requires', async ({ pag
   await expect(sourceLink).toHaveAttribute('href', 'https://github.com/amc-corey-cox/SwimBuddy')
 })
 
-test('opens IndexedDB and seeds the household on first run', async ({ page }) => {
+test('opens IndexedDB and seeds the roster on first run', async ({ page }) => {
   // Unit tests use fake-indexeddb; this is the only check that the storage layer
   // works in a real browser engine.
   await page.goto('/SwimBuddy/')

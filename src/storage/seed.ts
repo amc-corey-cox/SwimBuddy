@@ -8,9 +8,11 @@ import type { CatalogueCollection, RecordInput, SwimBuddyStore } from './store'
  * Three swimmers to start with: two adults and one youth.
  *
  * The shape is the point rather than the people — a roster with somebody on it
- * is something to press, and an empty one is a form. The names are obvious
- * placeholders so that renaming them on the roster screen is clearly the first
- * thing to do, and no real family data belongs in a public repository.
+ * is something to press, and an empty one is a form. Nobody real goes in a
+ * public repository, so these are stand-ins, and they are alphabetical for the
+ * same reason Alice and Bob are: on a screen showing three cards at once, the
+ * first letter is enough to tell whose numbers you are looking at. Short, too,
+ * because a name has to survive being read at arm's length off a wet phone.
  *
  * Base paces are provisional: a real one comes from a timed test set. Since no
  * TestSet row exists for a freshly seeded swimmer, the app can tell the
@@ -23,9 +25,9 @@ export interface SeedSwimmer {
 }
 
 export const SEED_SWIMMERS: readonly SeedSwimmer[] = [
-  { name: 'Swimmer 1', provisional_base_pace: 120, is_youth: false },
-  { name: 'Swimmer 2', provisional_base_pace: 130, is_youth: false },
-  { name: 'Swimmer 3', provisional_base_pace: 135, is_youth: true },
+  { name: 'Ari', provisional_base_pace: 120, is_youth: false },
+  { name: 'Bodhi', provisional_base_pace: 130, is_youth: false },
+  { name: 'Cleo', provisional_base_pace: 135, is_youth: true },
 ]
 
 export interface SeedResult {
@@ -39,7 +41,7 @@ export interface SeedResult {
 }
 
 /**
- * Populates an empty store with the default household and settings.
+ * Populates an empty store with the default roster and settings.
  *
  * Idempotent, and deliberately conservative: it seeds only when no swimmers
  * exist at all, tombstoned ones included. Someone who deletes every swimmer has
@@ -48,7 +50,7 @@ export interface SeedResult {
 export async function seedIfEmpty(store: SwimBuddyStore): Promise<SeedResult> {
   // The decision to seed counts tombstones; the list handed back to the caller
   // does not. Callers render this, and every other read hides deleted rows.
-  // Catalogues seed independently of the household. They are reference data, and
+  // Catalogues seed independently of the roster. They are reference data, and
   // an upgrade that adds a row should reach a store someone is already using —
   // whereas re-seeding swimmers into a store someone emptied would undo a decision.
   const catalogueEntries = await seedCatalogues(store)

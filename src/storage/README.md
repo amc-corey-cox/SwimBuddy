@@ -8,7 +8,7 @@ may import `idb` or touch IndexedDB — see CLAUDE.md, "Future backend".
 | `schema.ts` | Store definitions, indexes, and the ordered migration list     |
 | `db.ts`     | The single `openDB` call, plus the multi-tab upgrade handlers  |
 | `store.ts`  | `SwimBuddyStore`: the interface everything else uses           |
-| `seed.ts`   | The default household, written only into an empty store        |
+| `seed.ts`   | The default roster, written only into an empty store           |
 | `index.ts`  | The public surface; import from here, not from the files above |
 
 ## Records

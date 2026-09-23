@@ -107,7 +107,7 @@ test('the length buttons change what is offered', async ({ page }) => {
 })
 
 test('the youth swimmer is offered something within the cap', async ({ page }) => {
-  // The household seeds Me, Wife and Son; the son is the youth profile.
+  // The third swimmer on the seed roster is the youth profile.
   await page.goto('/SwimBuddy/')
   await page.locator('[data-testid^="swimmer-"]').nth(2).click()
   await page.getByTestId('start-practice').click()

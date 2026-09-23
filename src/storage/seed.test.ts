@@ -25,7 +25,7 @@ beforeEach(async () => {
 })
 
 describe('seeding an empty store', () => {
-  it('creates the household from the spec', async () => {
+  it('creates the roster from the spec', async () => {
     const result = await seedIfEmpty(store)
 
     expect(result.seeded).toBe(true)

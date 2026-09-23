@@ -2,9 +2,9 @@ import type { Swimmer } from '../core/types'
 import { FIXTURE_REFERENCE_DATE, daysBefore } from './constants'
 
 /**
- * Three synthetic swimmers shaped like the household in CLAUDE.md: a returning
- * ex-competitor, a fitness swimmer, and a youth swimmer. Names are invented —
- * this repository is public, so no real family data lives here.
+ * Three synthetic swimmers spanning the range the rules have to cover: a
+ * returning ex-competitor, a fitness swimmer, and a youth swimmer. Names are
+ * invented — this repository is public, so nobody real lives here.
  */
 export function demoSwimmers(referenceDate: number = FIXTURE_REFERENCE_DATE): Swimmer[] {
   const created = daysBefore(referenceDate, 120)

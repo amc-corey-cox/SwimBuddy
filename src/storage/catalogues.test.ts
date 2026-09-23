@@ -113,8 +113,8 @@ describe('the catalogue collections', () => {
     )
   })
 
-  it('seeds the catalogues even when the household is already there', async () => {
-    // Reference data and the household have different rules: an upgrade adding an
+  it('seeds the catalogues even when the roster is already there', async () => {
+    // Reference data and the roster have different rules: an upgrade adding an
     // activity has to reach a store someone is already using.
     await store.swimmers.create({
       name: 'Existing',
