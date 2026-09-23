@@ -12,8 +12,12 @@ satisfied from day one — a backend is planned, see "Future backend" below.
 ## Users
 
 A **roster** of swimmers, entered by whoever set the app up. There is no fixed number and
-no fixed household: a swimmer is a name, a birth year, a base pace and whether they are
-youth. Both of those last two are chosen when the swimmer is added and editable after.
+no fixed household: a swimmer is a name, a base pace and whether they are youth. The last
+two are chosen when the swimmer is added and editable after.
+
+There is deliberately no date of birth. Age itself drives nothing — every rule that cares
+reads the youth flag — so storing one would mean holding a child's date of birth on a
+phone to derive a boolean somebody already typed. The flag is the whole of it.
 
 Swimmers come in two kinds, and the only thing that distinguishes them is which safety
 rules apply:
@@ -71,7 +75,7 @@ Measuring base pace (prompt a retest every 4–6 weeks):
 
 - Timed 400 and timed 200, rested.
 - `base_pace_seconds = (T400 - T200) / 2`
-- For the 11-year-old use a 200/100 test and do not push maximal effort.
+- For youth swimmers use a 200/100 test and do not push maximal effort.
 
 Store base pace per swimmer per stroke group: free (tested), plus offsets for others
 (+10s back, +15s breast, +12s fly) unless separately tested.
@@ -272,7 +276,7 @@ it. This section is the shape in prose — when the two disagree, the schema is 
 this is stale.
 
 ```
-Swimmer   { id, name, birth_year, base_pace_by_stroke, load_factor, is_youth }
+Swimmer   { id, name, base_pace_by_stroke, load_factor, is_youth }
 Activity  { id, name, aliases, paced, stroke_group, mode, extent_kind: distance|time|either }
 Equipment { id, name, aliases, implies_mode }
 EffortBand{ id, name, aliases, rank }
@@ -413,8 +417,9 @@ losing the end of a workout is better than handing a child one they should not s
 
 Which caps apply is decided by one flag on the swimmer, chosen when they are added to the
 roster. That makes it a setting someone can get wrong, so the roster screen asks plainly
-rather than inferring it from a birth year, and the flag is what every rule reads — there
-is no second place where age is interpreted. In a coached practice the caps are the
+and the flag is what every rule reads. There is no date of birth to infer it from and no
+second place where age is interpreted, which is the point: one answer, given once, read
+everywhere. In a coached practice the caps are the
 strictest of everyone present for anything shared: an arrangement no youth swimmer can be
 given safely is not offered to a practice containing one, even though the adults in it
 could swim it. Each swimmer's own resolved workout is then capped for them individually,
