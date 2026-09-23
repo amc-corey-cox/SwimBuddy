@@ -1,138 +1,95 @@
 # Swim Buddy
 
-A local-first swim workout PWA for one family. Generates workouts scaled to each
-swimmer's fitness and adapts them from post-swim feedback. No accounts, no telemetry,
-no subscriptions, works offline at the pool.
+A swim workout planner for one family, built to be opened at the side of a pool with wet
+hands. It writes each swimmer a workout scaled to their own fitness, shows it one set at
+a time in large type, and uses how the last swim felt to decide what the next one should
+be. No accounts, no subscriptions, no network. Everything stays on the phone.
 
-Full spec: [`docs/spec.md`](docs/spec.md). Build order: [`docs/roadmap.md`](docs/roadmap.md).
-How development is done: [`CLAUDE.md`](CLAUDE.md).
+**[Open Swim Buddy →](https://amc-corey-cox.github.io/SwimBuddy/)**
 
-## Status
+## Install it on your phone
 
-Build order step 1 of 9, plus the CI and preview machinery the later steps depend on.
-The app itself is still a placeholder page — storage, parser, templates and screens
-come next.
+It runs in any browser, but installing it is worth the ten seconds: it opens full screen
+without the address bar eating the top of the workout, it keeps the screen awake while
+you swim, and it works with no signal.
 
-## Develop
+On **iPhone or iPad**, open the link in Safari, tap Share, then _Add to Home Screen_.
+It has to be Safari — Chrome on iOS cannot install web apps.
 
-```sh
-npm install
-npm run dev        # vite dev server
-npm test           # vitest, headless
-npm run check      # every CI gate except the browser tests
-npm run test:e2e   # Playwright smoke tests (needs a browser installed)
-```
+On **Android**, open the link in Chrome, tap the ⋮ menu, then _Install app_ or _Add to
+home screen_.
 
-`npm run check` runs lint, formatting, typecheck, unit tests with coverage, the
-production build and the bundle check. The browser tests are deliberately separate,
-because they need a Chromium install that CI provides and a fresh checkout does not.
+Once it has loaded once, it works offline. Pools do not have signal, so this is the
+normal case rather than a fallback: the whole app, including the workout you are part
+way through, is served from the phone.
 
-Individual gates:
+## Using it
 
-| Command                 | What it checks                                              |
-| ----------------------- | ----------------------------------------------------------- |
-| `npm run lint`          | ESLint, including the `src/core/` purity rules              |
-| `npm run format:check`  | Prettier (`npm run format` fixes)                           |
-| `npm run typecheck`     | `tsc -b` across the app, build-tooling and e2e projects     |
-| `npm run test:coverage` | Unit tests with coverage thresholds                         |
-| `npm run test:e2e`      | Playwright smoke tests against the real built page          |
-| `npm run check:bundle`  | Asserts no fixture data reached the production bundle       |
-| `npm run schema:setup`  | Builds the LinkML toolchain and applies `schema/patches/`   |
-| `npm run icons`         | Regenerates the app icons from `scripts/generate-icons.mjs` |
-| `npm run schema:gen`    | Regenerates the model from `schema/swimbuddy.yaml`          |
+Tap a swimmer, choose how long you have, and the app picks a workout and tells you why
+it picked that one — which is the point of a rule-based planner rather than a magic one.
+Start it and you get one set per card: the distance, how many, when to leave, and
+whatever the coach note said, in type you can read at arm's length through goggles.
 
-All rule-based logic lives in `src/core/` as pure functions and must be covered by
-tests runnable with `npm test` — development happens in a cloud sandbox with no device
-access, so correctness cannot rely on a browser.
+At the end, three buttons: too easy, about right, too hard, plus whether you finished
+the main set. That is the whole rating and it should take under ten seconds. It is also
+the only thing the app knows about how the swim went, so it is worth being honest with.
 
-TypeScript is pinned to `~6.0.3` on purpose: `typescript-eslint` caps its peer range
-at `<6.1.0`, so a float to 6.1 would break linting. Raise the pin only once the lint
-tooling supports the newer version.
+## How it decides what to give you
 
-ESLint enforces that boundary rather than trusting it: `src/core/` may not reference
-the DOM, IndexedDB or `localStorage`, and may not import `src/storage/` or `src/ui/`.
+Every swimmer has a **base pace** — a sustainable time per 100 — and sets are written
+relative to it rather than in absolute seconds, so `8x100 free @ base+15` means something
+different for each of you and the same workout can be handed to all three.
 
-### Browser tests in a sandbox
+Each swimmer also carries a **load factor**, which moves with the ratings. Say a session
+was too hard, or that you did not finish the main set, and it drops; string together
+easy ones and it climbs. It scales how many repetitions you get and loosens or tightens
+the send-offs. Two hard swims in a row buy a few extra seconds on every interval for the
+next couple of sessions. A break from swimming lowers it before you come back, so the
+first session after a layoff is shorter rather than a wall.
 
-If your environment ships a preinstalled Chromium whose revision does not match the
-installed Playwright, point at it instead of downloading a second copy:
+The youth swimmer has hard caps the rules are not allowed to cross: a maximum session
+distance, a minimum rest between repetitions, and a lower ceiling on the load factor.
+If a workout would exceed the distance cap it is trimmed, and a workout that cannot be
+trimmed under it is not offered at all.
 
-```sh
-PLAYWRIGHT_CHROMIUM_PATH=/opt/pw-browsers/chromium npm run test:e2e
-```
+## Your data
 
-CI installs the matching browser and leaves that variable unset.
+It lives in the browser's own storage on that one device. There is no account, no
+server, nothing is uploaded, and there is no analytics or tracking of any kind. Nothing
+is loaded from a third party — no CDN fonts, no scripts from anywhere else.
 
-## Synthetic data
+The flip side is that the data is only as safe as the phone. Clearing the browser's site
+data or deleting the app deletes the swim history with it, and there is no export yet —
+that arrives with History. Each device keeps its own store, so installing it on a second
+phone starts from scratch rather than sharing what is on the first.
 
-`src/fixtures/` holds three invented swimmers, three templates and about eight weeks
-of session history. The names and times are made up — this repository is public, so
-no real family data lives in it.
+## What works, and what does not
 
-Fixtures are pure and deterministic: every record derives from a reference date passed
-in by the caller, and nothing calls `Date.now()`. They serve as the parser's test
-corpus, as the history the adaptation rules will be tested against, and as the seed
-data that makes PR previews show a populated app. See
-[`src/fixtures/README.md`](src/fixtures/README.md).
+The loop works end to end: pick a swimmer, get a workout, swim it, rate it, and the next
+one changes. Offline works. Installing works.
 
-## Storage
+Not built yet, in rough order of how much you will miss them:
 
-All persistence goes through `src/storage/`, which owns the only `idb` import in
-the codebase. Records carry a UUIDv4, `created_at`/`updated_at` and a `deleted`
-tombstone; deletes are soft so a future sync can propagate them. Schema changes go
-through an ordered migration list, and the selector that decides which migrations
-to run is a pure function so it can be tested without a database.
+- **Settings**, so the three swimmers are still called Me, Wife and Son, the pool unit
+  is whatever it was seeded as, and a base pace cannot be changed from inside the app.
+- **History**, so a past session is recorded but cannot be looked at.
+- **The test set flow**, so base paces are provisional numbers rather than measured
+  ones. The app knows they are provisional and can tell the difference.
+- **Swimming together**, meaning several workouts in progress at once on one phone,
+  handed round between swimmers.
+- **Per-set feedback**, for saying that one particular set was too hard rather than
+  rating the whole session.
 
-Unit tests run against `fake-indexeddb`; the app also opens the store and seeds on
-startup so the Playwright suite proves IndexedDB works on a real browser engine.
-See [`src/storage/README.md`](src/storage/README.md).
+## Development
 
-## CI
-
-Every pull request runs lint, formatting, typecheck, unit tests with coverage
-thresholds, a production build, the bundle check, and Playwright smoke tests in a real
-browser at phone and desktop viewports. The browser tests assert the page renders with
-no console errors and no failed requests — that is the check that catches a blank
-page, which no unit test can.
-
-## Previews and deploys
-
-Both publish to the `gh-pages` branch, which serves:
-
-```
-/                 production, deployed from main
-/pr-12/           live preview of PR #12
-/pr-12/screenshots/
-```
-
-Every pull request from this repository gets a preview at
-`https://amc-corey-cox.github.io/SwimBuddy/pr-<number>/`, linked from a comment on the
-PR along with phone and desktop screenshots. It updates on every push and is removed
-when the PR closes. Pull requests from forks are skipped, because a fork's token
-cannot publish.
-
-Previews are built with `VITE_SHOW_FIXTURES=true` so they render the synthetic store.
-Production builds leave the flag unset, and the fixtures are tree-shaken away —
-`npm run check:bundle` fails the build if they ever survive.
-
-Publishing is plain `git` in [`scripts/publish-to-gh-pages.sh`](scripts/publish-to-gh-pages.sh),
-so there is no third-party action in the deploy path. Production deploys preserve
-`pr-*` directories; preview deploys touch only their own.
-
-### One-time setup
-
-Under **Settings → Pages → Build and deployment**, set **Source: Deploy from a
-branch**, branch **`gh-pages`**, folder **`/ (root)`**.
-
-The `gh-pages` branch is created by the first deploy or preview run, so let one run
-before changing the setting. Repo settings are not available in the GitHub mobile app —
-use a browser.
-
-Vite's `base` is `/SwimBuddy/` to match the project Pages URL; `BASE_PATH` overrides it
-(previews use it, and a custom domain would too).
+Commands, CI, previews, the deploy path and the architecture rules are in
+[`docs/development.md`](docs/development.md). What the app is meant to be is in
+[`docs/spec.md`](docs/spec.md); the order it gets built in is
+[`docs/roadmap.md`](docs/roadmap.md); how development is done is in
+[`CLAUDE.md`](CLAUDE.md).
 
 ## License
 
-[AGPLv3](LICENSE). Every screen links back to this repository so the §13 network-use
-obligation holds for any future hosted instance — a Playwright test asserts that link
+[AGPLv3](LICENSE). Every screen links back to this repository, so the section 13
+network-use obligation holds for any hosted instance — a browser test asserts that link
 is present.
