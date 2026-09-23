@@ -591,9 +591,6 @@ classes:
       name:
         range: string
         required: true
-      birth_year:
-        range: integer
-        required: true
       base_pace_by_stroke:
         range: BasePaceByStroke
         required: true

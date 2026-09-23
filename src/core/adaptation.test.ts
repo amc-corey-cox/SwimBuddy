@@ -12,7 +12,6 @@ function swimmer(overrides: Partial<Swimmer> = {}): Swimmer {
     ...META,
     id: 'swimmer-1',
     name: 'Test',
-    birth_year: 1980,
     base_pace_by_stroke: { free: 120 },
     load_factor: 1,
     is_youth: false,

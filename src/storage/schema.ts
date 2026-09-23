@@ -1,4 +1,10 @@
-import type { DBSchema, IDBPDatabase, IDBPTransaction, StoreNames } from 'idb'
+import {
+  unwrap,
+  type DBSchema,
+  type IDBPDatabase,
+  type IDBPTransaction,
+  type StoreNames,
+} from 'idb'
 import type {
   Activity,
   EffortBand,
@@ -18,7 +24,7 @@ export const DATABASE_NAME = 'swim-buddy'
  * Bumped whenever a migration is added. Kept in step with
  * `SCHEMA_VERSION` in core/types, which is what the JSON export records.
  */
-export const DATABASE_VERSION = 2
+export const DATABASE_VERSION = 3
 
 /** The settings row is a singleton, addressed by a fixed id. */
 export const SETTINGS_ID = 'f0000000-0000-4000-8000-000000000001'
@@ -106,6 +112,33 @@ export const MIGRATIONS: readonly Migration[] = [
       // survive an export and an import on another phone.
       for (const store of CATALOGUE_STORES) {
         database.createObjectStore(store, { keyPath: 'id' })
+      }
+    },
+  },
+  {
+    version: 3,
+    description: 'Drop birth_year from swimmers: no rule reads it, and the youth flag decides.',
+    apply({ transaction }) {
+      // A raw cursor rather than idb's promise API, on purpose. `apply` is
+      // synchronous so the upgrade loop can run every migration inside the one
+      // versionchange transaction, and an awaited promise here would let that
+      // transaction commit while rows were still being rewritten. Request
+      // callbacks keep it open until the last row is done.
+      //
+      // Leaving the field would not break the app, which never reads it, but it
+      // would break the export: the generated JSON Schema closes every object,
+      // so one stale swimmer would fail validation on the way out.
+      const swimmers = unwrap(transaction.objectStore('swimmers'))
+      const request = swimmers.openCursor()
+      request.onsuccess = () => {
+        const cursor = request.result
+        if (cursor === null) return
+        const value = { ...(cursor.value as Swimmer & { birth_year?: number }) }
+        if (value.birth_year !== undefined) {
+          delete value.birth_year
+          cursor.update(value)
+        }
+        cursor.continue()
       }
     },
   },
