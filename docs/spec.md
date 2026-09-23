@@ -385,18 +385,41 @@ import is checked before it is trusted, rather than after it has overwritten som
 5. **Roster** — add a swimmer, name them, choose adult or youth, set a base pace, remove
    them. Reachable from screen 1 rather than buried in settings, because the roster
    changes at the pool and not at a desk. The one screen without which a team cannot
-   exist, and the reason the swimmers are still called Me, Wife and Son.
+   exist.
 6. **History** — sessions per swimmer, total distance, weekly volume chart, and any sets
    flagged during a practice.
 7. **Settings** — pool unit/length, test set entry, JSON export/import, link to source.
 
-Screens 1 to 4 are built for a single swimmer. The multi-swimmer half of 1 and 3, the
-roster and History and Settings are not, so a swimmer cannot be named or added, the pool
-unit is whatever seeding set, and a base pace can only be changed by editing storage. A
-workout in progress is held in memory: leaving the workout screen loses it, which is why
-the wake lock matters and why a session is only written once it has been rated. The
-Practice record is what fixes that, and it is a prerequisite for the multi-swimmer card
-rather than a nicety — the phone holding four people's practice is the only copy of it,
+Each swimmer's card shows the set _they_ are on, which need not be the one being called.
+Balancing gets everybody finishing at roughly the same time rather than exactly, and
+somebody always stops for goggles, so a card carries two taps that move that swimmer
+alone. Moving the practice moves everybody and keeps whatever drift they had: a swimmer a
+set behind is still a set behind, because silently catching them up would lose the fact
+that they are behind.
+
+A card also carries the two things that happen to people. Getting out keeps what that
+swimmer swam and stops showing them a set they are not doing, and they are still rated at
+the end like everybody else. Somebody who turns up late joins where the practice already
+is, resolved on their own rather than by rebalancing everyone — the others are partway
+through sets whose repetition counts must not move under them.
+
+The third chip on a card is a set the swimmer did not finish. It is kept separate from
+"too hard" because they are different facts and only one of them is about the set: people
+stop for cramp, for the clock, or because somebody has to leave. Where they coincide the
+app joins them up, and any unfinished set opens the post-swim screen on "cut it short"
+already chosen, since that is the answer the adaptation rules actually read.
+
+A practice can be ended before the end, and that is a normal thing rather than an escape
+hatch. Ending records what everybody actually swam — the sets they got past, not the ones
+that were planned — because a history saying 2000 on a day somebody swam 800 makes every
+rule that reads volume wrong from then on. The set on screen when it stops is the one
+nobody finished.
+
+Screens 1 to 5 are built. History and Settings are not, so a past session cannot be
+looked at, the pool unit is whatever seeding set, and a base pace can only be changed on
+the roster rather than measured. A practice is still held in memory: leaving the screen
+loses it, which is why the wake lock matters. The Practice record is what fixes that, and
+it is the next thing — the phone holding four people's practice is the only copy of it,
 and a screen lock should not be able to end it.
 
 ## Future backend (not v1 — do not build it yet)

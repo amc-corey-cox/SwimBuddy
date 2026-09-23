@@ -355,3 +355,162 @@ test('a practice rates every swimmer before it ends', async ({ page }) => {
 
   await expect(page.getByTestId('screen-home')).toBeVisible()
 })
+
+/**
+ * Balancing gets everybody finishing a set at roughly the same time, not exactly,
+ * and somebody always stops for goggles. The set being called out is one number;
+ * where a swimmer actually is need not match it.
+ */
+test('one swimmer can be moved without moving the practice', async ({ page }) => {
+  await startSwimming(page, 3)
+
+  const practiceAt = async () => (await page.getByTestId('progress').textContent()) ?? ''
+  const before = await practiceAt()
+
+  const first = page.locator('[data-testid^="set-card-"]').first()
+  const swimmerId = (await first.getAttribute('data-testid'))?.replace('set-card-', '') ?? ''
+
+  await page.getByTestId(`nudge-on-${swimmerId}`).click()
+
+  // The practice has not moved, and that swimmer is now marked as ahead of it.
+  expect(await practiceAt()).toBe(before)
+  await expect(page.getByTestId(`drift-${swimmerId}`)).toHaveText('1 ahead')
+
+  // Nobody else drifted.
+  await expect(page.locator('[data-testid^="drift-"]')).toHaveCount(1)
+})
+
+test('a swimmer who is behind keeps their place when the practice moves on', async ({ page }) => {
+  await startSwimming(page, 2)
+
+  const first = page.locator('[data-testid^="set-card-"]').first()
+  const swimmerId = (await first.getAttribute('data-testid'))?.replace('set-card-', '') ?? ''
+
+  // Put the practice on set two, then drop one swimmer back to set one.
+  await page.getByTestId('next').click()
+  await page.getByTestId(`nudge-back-${swimmerId}`).click()
+  await expect(page.getByTestId(`drift-${swimmerId}`)).toHaveText('1 behind')
+
+  // Moving the practice on carries the drift rather than silently correcting it.
+  await page.getByTestId('next').click()
+  await expect(page.getByTestId(`drift-${swimmerId}`)).toHaveText('1 behind')
+})
+
+test('a swimmer shows their own set, not the one being called', async ({ page }) => {
+  await startSwimming(page, 2)
+
+  const cards = page.locator('[data-testid^="set-card-"]')
+  const swimmerId =
+    (await cards.first().getAttribute('data-testid'))?.replace('set-card-', '') ?? ''
+
+  const headlines = async () => cards.locator('[data-testid="headline"]').allTextContents()
+  const together = await headlines()
+
+  await page.getByTestId(`nudge-on-${swimmerId}`).click()
+  const apart = await headlines()
+
+  // The nudged swimmer's card changed; the other one did not.
+  expect(apart[0]).not.toBe(together[0])
+  expect(apart[1]).toBe(together[1])
+})
+
+/**
+ * Pool time runs out, a child has had enough, somebody has to leave. The swim
+ * still happened, so ending early records what was actually swum rather than
+ * throwing the session away — which is what leaving the screen used to do.
+ */
+test('a practice can be ended early and still counts', async ({ page }) => {
+  await startSwimming(page, 1)
+
+  // Two sets in, then stop.
+  await page.getByTestId('next').click()
+  await page.getByTestId('next').click()
+  const swumSoFar = await page.getByTestId('progress').textContent()
+  expect(swumSoFar).toContain('3 of')
+
+  await page.getByTestId('end-practice').click()
+  await expect(page.getByTestId('end-practice')).toHaveText('End it?')
+  await page.getByTestId('end-practice').click()
+
+  await expect(page.getByTestId('screen-post-swim')).toBeVisible()
+  await page.getByTestId('effort-about_right').click()
+  await expect(page.getByTestId('screen-home')).toBeVisible()
+
+  const stored = await page.evaluate(
+    async () =>
+      new Promise<number>((resolve, reject) => {
+        const request = indexedDB.open('swim-buddy')
+        request.onerror = () => {
+          reject(new Error('could not open the database'))
+        }
+        request.onsuccess = () => {
+          const db = request.result
+          const all = db.transaction('sessions').objectStore('sessions').getAll()
+          all.onsuccess = () => {
+            const sessions = all.result as { resolved_sets: { sets: unknown[] }[] }[]
+            const last = sessions[sessions.length - 1]
+            resolve(last?.resolved_sets.reduce((n, s) => n + s.sets.length, 0) ?? -1)
+          }
+        }
+      }),
+  )
+
+  // Two sets were finished, and the third was on screen when it stopped.
+  expect(stored).toBe(2)
+})
+
+test('a swimmer can get out and the rest carry on', async ({ page }) => {
+  await startSwimming(page, 3)
+
+  const cards = page.locator('[data-testid^="set-card-"]')
+  await expect(cards).toHaveCount(3)
+
+  const id = (await cards.first().getAttribute('data-testid'))?.replace('set-card-', '') ?? ''
+  await page.getByTestId(`leave-${id}`).click()
+
+  await expect(cards).toHaveCount(2)
+  await expect(page.getByTestId(`set-card-${id}`)).toHaveCount(0)
+
+  // They are still rated at the end: what they swam counts.
+  await advanceToFinish(page)
+  await page.getByTestId('finish').click()
+  for (let rating = 0; rating < 3; rating += 1) {
+    await expect(page.getByTestId('screen-post-swim')).toBeVisible()
+    await page.getByTestId('effort-about_right').click()
+  }
+  await expect(page.getByTestId('screen-home')).toBeVisible()
+})
+
+test('somebody can join a practice that has already started', async ({ page }) => {
+  await startSwimming(page, 2)
+
+  await expect(page.locator('[data-testid^="set-card-"]')).toHaveCount(2)
+  await expect(page.getByTestId('join-row')).toBeVisible()
+
+  // The row itself is also a `join-` testid, so select the button inside it.
+  await page.getByTestId('join-row').getByRole('button').first().click()
+
+  await expect(page.locator('[data-testid^="set-card-"]')).toHaveCount(3)
+  // Nobody is left to add, so the row goes.
+  await expect(page.getByTestId('join-row')).toHaveCount(0)
+})
+
+test('a set nobody finished pre-answers the post-swim question', async ({ page }) => {
+  await startSwimming(page, 2)
+
+  const id =
+    (await page.locator('[data-testid^="set-card-"]').first().getAttribute('data-testid'))?.replace(
+      'set-card-',
+      '',
+    ) ?? ''
+
+  await page.getByTestId(`flag-unfinished-${id}`).click()
+  await expect(page.getByTestId(`flag-unfinished-${id}`)).toHaveAttribute('aria-pressed', 'true')
+
+  await advanceToFinish(page)
+  await page.getByTestId('finish').click()
+
+  // The first swimmer rated is the one who flagged it, and their toggle already
+  // says they cut it short.
+  await expect(page.getByTestId('completed')).toHaveText('Cut it short')
+})
