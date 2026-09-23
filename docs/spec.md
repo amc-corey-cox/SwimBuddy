@@ -1,6 +1,7 @@
 # Swim Buddy — Project Spec
 
-A local-first swim workout PWA for a family of three. Generates workouts scaled to each
+A local-first swim workout PWA for a small group of swimmers — a family, a masters lane,
+a squad — swimming alone or watched by a coach. Generates workouts scaled to each
 swimmer's fitness and adapts them based on post-swim feedback. No accounts, no telemetry,
 no subscriptions. Works offline at the pool.
 
@@ -10,16 +11,41 @@ satisfied from day one — a backend is planned, see "Future backend" below.
 
 ## Users
 
-| Swimmer  | Notes                                                            |
-| -------- | ---------------------------------------------------------------- |
-| Me       | Ex-swim-team, ~30 years out of the water. Wants real sets.       |
-| Wife     | Fitness swimmer.                                                 |
-| Son (11) | Needs variety, drills, shorter sets. Must not feel like a grind. |
+A **roster** of swimmers, entered by whoever set the app up. There is no fixed number and
+no fixed household: a swimmer is a name, a birth year, a base pace and whether they are
+youth. Both of those last two are chosen when the swimmer is added and editable after.
+
+Swimmers come in two kinds, and the only thing that distinguishes them is which safety
+rules apply:
+
+| Kind  | Means                                                                         |
+| ----- | ----------------------------------------------------------------------------- |
+| Adult | No session distance cap, load factor up to 1.4, 5s minimum rest.              |
+| Youth | Hard caps on distance, load factor and rest. See Safety. Must not be a grind. |
+
+The app is used two ways, and both matter:
+
+- **Solo.** One swimmer, their own device, their own workout. They rate their own swim.
+- **Coached.** One device — the coach's — holds a whole practice. Everyone is doing the
+  same arrangement, resolved to each swimmer's own numbers, and the coach moves the
+  practice along and records how it is going for each of them as it happens.
+
+The coach is a role, not a record. There are no accounts and no identity in this app, so
+"coach mode" is a way of using the device rather than a person in the model — which also
+means the coach can be one of the swimmers, which is the common case in a family. A
+parent swimming their own set while watching an eleven-year-old is the same thing as a
+masters swimmer running the lane.
+
+The motivating roster, and the one the fixtures are built from: an ex-swim-team adult
+thirty years out of the water who wants real sets, an adult fitness swimmer, and an
+eleven-year-old who needs variety and drills.
 
 ## Non-goals (v1)
 
 - No watch integration, stroke detection, or automatic lap counting.
-- No login, no cloud sync, no multi-family support.
+- No login, no accounts, no cloud sync.
+- One roster per device. No multiple teams, no swimmer belonging to two rosters.
+- No lane or training-group split within a practice: one practice, one arrangement.
 - No charts beyond a simple weekly-volume view.
 
 ## Tech
@@ -203,7 +229,13 @@ Post-swim the swimmer rates:
 
 - **Effort**: too easy / about right / too hard
 - **Completed?**: finished main set / cut it short
-- (Son only) **Fun**: thumbs up / down
+- (Youth only) **Fun**: thumbs up / down
+
+In a coached practice the coach may enter that rating on the swimmer's behalf, which is
+an observation rather than a self-report and is not quite the same signal. The session
+records which it was, so a later rule can weigh them differently. Today they are treated
+identically — recording the provenance costs nothing and inventing a weighting before
+there is any history to check it against would be guessing.
 
 Rules:
 
@@ -215,11 +247,22 @@ Rules:
   easy swim would cover in that time. Approximate on purpose: it keeps one volume number
   meaningful without pretending treading water is swimming.
 - Over 10 days since last swim → drop `load_factor` 10% and pick a shorter template.
-- Son: cap `load_factor` at 1.15; two consecutive thumbs-down biases selection toward
-  drill/fun tags.
+- Youth swimmers: cap `load_factor` at 1.15; two consecutive thumbs-down biases selection
+  toward drill/fun tags.
 
 Template selection: prefer tags unused in the last 3 sessions, respect requested session
 length, and never schedule two `intensity: hard` templates back to back.
+
+Selecting for a coached practice picks **one** arrangement for everybody rather than one
+each, because a practice is a whiteboard and a whiteboard has one workout on it. The
+arrangement is then resolved per swimmer, so the numbers differ while the shape does not.
+A candidate is only eligible if every swimmer in the practice can be given it safely —
+one the youth distance cap cannot trim is not offered to a practice that includes a youth
+swimmer, exactly as it is not offered to that swimmer alone. Scoring is against the
+practice: the rules above are evaluated per swimmer and the worst score wins, so one
+person who did a hard session yesterday is enough to steer the whole practice off a hard
+one. Adaptation still runs per swimmer — the shared thing is the arrangement, never the
+load factor.
 
 ## Data model
 
@@ -236,8 +279,13 @@ EffortBand{ id, name, aliases, rank }
 Pattern   { id, name, aliases, scopes }
 Structure { id, name, aliases, min_swimmers }
 Template  { id, name, tags, intensity, level_range, raw_text, parsed_sets }
-Session   { id, swimmer_id, template_id, date, resolved_sets, total_distance,
-            effort_rating, completed, fun_rating, notes }
+Practice  { id, template_id, date, position, finished, participants[] }
+            participant { swimmer_id, resolved_sets, total_distance, position,
+                          session_id }
+Session   { id, swimmer_id, template_id, practice_id, date, resolved_sets,
+            total_distance, effort_rating, rated_by: self|coach, completed,
+            fun_rating, set_feedback[], notes }
+            set_feedback { section_index, set_index, effort_rating, rated_by }
 TestSet   { id, swimmer_id, date, protocol: 400/200|200/100, t400, t200,
             computed_base_pace }
 Settings  { pool_unit: yards|meters, pool_length }
@@ -249,6 +297,27 @@ add rather than a release.
 
 `TestSet.protocol` records which pair of swims the times are, because adults swim a
 400/200 and youth a 200/100, and the two compute base pace differently.
+
+A **Practice** is one visit to the pool by one or more swimmers doing one arrangement. It
+exists so a workout in progress survives the phone being locked, handed to somebody else
+or dropped in a bag — today a swim lives in memory and leaving the screen loses it, which
+is indefensible once a coach is holding the only copy of four people's practice. It holds
+each participant's resolved workout and their own position in it, so the coach can move
+between swimmers freely and nobody loses their place. A solo swim is a practice with one
+participant; there is no second code path.
+
+`Practice.position` is where the coach has the practice as a whole, which is the number
+on the wall; a participant's own position is where that swimmer actually is, because
+somebody always falls behind. A session is written per participant when they finish, so
+history stays per swimmer and the adaptation rules are untouched by any of this.
+
+`Session.rated_by` distinguishes a swimmer's own rating from a coach's observation, and
+`set_feedback` records that one particular set was too hard or too easy — pointing at a
+set by its position within that session's own `resolved_sets`, which cannot dangle
+because the sets are stored alongside it. Both are expected to be sparse. Set feedback is
+stored and shown in History and deliberately does **not** feed the adaptation rules yet:
+the rules should be written against real history rather than thresholds invented before
+any exists.
 
 `Session.total_distance` includes the easy-swim equivalent of any time-measured sets, so
 one number remains comparable week to week. That estimate is the answer, not a placeholder:
@@ -272,24 +341,45 @@ import is checked before it is trusted, rather than after it has overwritten som
 
 ## Screens (v1)
 
-1. **Home** — three big swimmer tiles, "Today's workout".
-2. **Pre-swim** — session length (30/45/60/75 min) + optional focus. Generates.
+1. **Home** — a tile per swimmer on the roster, and a way to start a practice with
+   several of them. Tapping one swimmer is the solo path; choosing several is the
+   coached one.
+2. **Pre-swim** — who is in, session length (30/45/60/75 min) + optional focus. Names the
+   arrangement it chose and why, for the practice as a whole.
 3. **Workout view** — the screen that matters. Large high-contrast text readable on a wet
    phone at arm's length. Wake lock on. One set per card, swipe between. Show resolved
    distances and send-off times, never formulas.
-4. **Post-swim** — three big rating buttons plus optional note. Under 10 seconds.
-5. **History** — sessions per swimmer, total distance, weekly volume chart.
-6. **Settings** — pool unit/length, test set entry, JSON export/import, link to source.
+4. **Practice view** — the coached form of the same screen. The current set across the
+   top, then a row per swimmer showing their numbers for it, since a send-off differs per
+   person and the coach is calling all of them. Tapping a swimmer's row records that this
+   set was too hard or too easy for them; tapping their name opens their own workout, at
+   their own position, and comes back. Nothing here is required: a coach who taps nothing
+   all practice still ends with a workout recorded for everyone.
+5. **Post-swim** — three big rating buttons plus optional note, under 10 seconds. In a
+   practice, once per swimmer, and the coach may answer for them.
+6. **Roster** — add a swimmer, name them, choose adult or youth, set a base pace, remove
+   them. The one screen without which a team cannot exist, and the reason the swimmers
+   are still called Me, Wife and Son.
+7. **History** — sessions per swimmer, total distance, weekly volume chart, and any sets
+   flagged during a practice.
+8. **Settings** — pool unit/length, test set entry, JSON export/import, link to source.
 
-Screens 1 to 4 are built. History and Settings are not, so the pool unit and length are
-whatever seeding set and a base pace can only be changed by editing storage. A workout in
-progress is held in memory: leaving the workout screen loses it, which is why the wake
-lock matters and why a session is only written once it has been rated.
+Screens 1, 2, 3 and 5 are built in their solo form. The practice view, the roster and
+History and Settings are not, so a swimmer cannot be named or added, the pool unit is
+whatever seeding set, and a base pace can only be changed by editing storage. A workout
+in progress is held in memory: leaving the workout screen loses it, which is why the wake
+lock matters and why a session is only written once it has been rated. The Practice
+record is what fixes that, and it is a prerequisite for the practice view rather than a
+nicety — a coach holding the only copy of four swimmers' practice cannot lose it to a
+screen lock.
 
 ## Future backend (not v1 — do not build it yet)
 
-A small sync server may follow: shared template library, syncing the three phones, maybe
-a coach mode. Keep the door open without building it:
+A small sync server may follow: a shared template library, syncing the devices on a
+roster, a coach and their swimmers seeing the same practice from different phones. That
+last one is the only reason multi-device matters — a practice on the coach's phone is
+already the whole practice, and sync is what would let a swimmer watch it from their own.
+Keep the door open without building it:
 
 - All business logic (parser, resolver, adaptation rules) lives in `src/core/` as pure
   functions with zero DOM and zero storage imports, so it can run server-side unchanged.
@@ -320,3 +410,12 @@ one-line decision rather than a hunt.
 Distance caps apply to the resolved session. A template that would resolve past the cap
 has its repetition counts reduced first, and is truncated only if that is not enough —
 losing the end of a workout is better than handing a child one they should not swim.
+
+Which caps apply is decided by one flag on the swimmer, chosen when they are added to the
+roster. That makes it a setting someone can get wrong, so the roster screen asks plainly
+rather than inferring it from a birth year, and the flag is what every rule reads — there
+is no second place where age is interpreted. In a coached practice the caps are the
+strictest of everyone present for anything shared: an arrangement no youth swimmer can be
+given safely is not offered to a practice containing one, even though the adults in it
+could swim it. Each swimmer's own resolved workout is then capped for them individually,
+so an adult in that practice is not held to a child's limits.

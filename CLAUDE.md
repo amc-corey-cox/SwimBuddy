@@ -1,8 +1,9 @@
 # Swim Buddy — how we work
 
-Swim Buddy is a local-first swim workout PWA for a family of three. **What** we are
-building is in [`docs/spec.md`](docs/spec.md); the order we build it in is
-[`docs/roadmap.md`](docs/roadmap.md). This file is about **how** development is done.
+Swim Buddy is a local-first swim workout PWA for a small roster of swimmers, swimming
+alone or watched by a coach. **What** we are building is in [`docs/spec.md`](docs/spec.md);
+the order we build it in is [`docs/roadmap.md`](docs/roadmap.md). This file is about
+**how** development is done.
 
 ## Read before you build
 
