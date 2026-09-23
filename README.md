@@ -120,9 +120,9 @@ Not built yet, in rough order of how much you will miss them:
 
 - **The roster**, so swimmers cannot be added, renamed or marked adult or youth. The
   three that exist are still called Me, Wife and Son.
-- **Coached practice**, where one device holds a whole practice — everybody on the same
-  arrangement resolved to their own numbers, with the coach moving it along and recording
-  how each of them is going.
+- **Swimming together**, where one phone gets passed around a practice — everybody on the
+  same workout resolved to their own numbers, with whoever is holding it recording how
+  each of them is going.
 - **Settings**, so the pool unit is whatever it was seeded as and a base pace cannot be
   changed from inside the app.
 - **History**, so a past session is recorded but cannot be looked at.

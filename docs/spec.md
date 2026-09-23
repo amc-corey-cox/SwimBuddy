@@ -1,7 +1,7 @@
 # Swim Buddy — Project Spec
 
 A local-first swim workout PWA for a small group of swimmers — a family, a masters lane,
-a squad — swimming alone or watched by a coach. Generates workouts scaled to each
+a squad — sharing one phone at the end of the lane. Generates workouts scaled to each
 swimmer's fitness and adapts them based on post-swim feedback. No accounts, no telemetry,
 no subscriptions. Works offline at the pool.
 
@@ -27,18 +27,22 @@ rules apply:
 | Adult | No session distance cap, load factor up to 1.4, 5s minimum rest.              |
 | Youth | Hard caps on distance, load factor and rest. See Safety. Must not be a grind. |
 
-The app is used two ways, and both matter:
+The app runs on one device that gets passed around. Whoever is holding it taps what
+happened — their own swim, or somebody else's. There is no coach mode, no sign-in and no
+notion of who is looking at the screen: a phone sitting on a kickboard at the end of a
+lane does not know who picked it up, and it should not pretend to.
 
-- **Solo.** One swimmer, their own device, their own workout. They rate their own swim.
-- **Coached.** One device — the coach's — holds a whole practice. Everyone is doing the
-  same arrangement, resolved to each swimmer's own numbers, and the coach moves the
-  practice along and records how it is going for each of them as it happens.
+Somebody usually ends up holding it more than the others, and that person is a coach in
+every sense except the one that would matter here. They are entering data. Building a
+role around them would buy a distinction the app cannot observe and would have to ask
+about, and asking is the cost. One swimmer alone is the same thing with the passing
+around left out — not a separate mode, just a practice with one person in it.
 
-The coach is a role, not a record. There are no accounts and no identity in this app, so
-"coach mode" is a way of using the device rather than a person in the model — which also
-means the coach can be one of the swimmers, which is the common case in a family. A
-parent swimming their own set while watching an eleven-year-old is the same thing as a
-masters swimmer running the lane.
+A roster is not an attendance list. Some of the roster is there and some is not, somebody
+turns up who has never used it before, and somebody gets out after the main set. So who
+is swimming today is chosen when a practice starts rather than configured in advance, a
+new swimmer can be added from that same screen without going anywhere else, and a
+practice can gain or lose a swimmer after it has begun.
 
 The motivating roster, and the one the fixtures are built from: an ex-swim-team adult
 thirty years out of the water who wants real sets, an adult fitness swimmer, and an
@@ -235,11 +239,8 @@ Post-swim the swimmer rates:
 - **Completed?**: finished main set / cut it short
 - (Youth only) **Fun**: thumbs up / down
 
-In a coached practice the coach may enter that rating on the swimmer's behalf, which is
-an observation rather than a self-report and is not quite the same signal. The session
-records which it was, so a later rule can weigh them differently. Today they are treated
-identically — recording the provenance costs nothing and inventing a weighting before
-there is any history to check it against would be guessing.
+Whoever is holding the phone enters that, which may or may not be the swimmer it is
+about. The app does not distinguish the two and does not try to.
 
 Rules:
 
@@ -257,8 +258,8 @@ Rules:
 Template selection: prefer tags unused in the last 3 sessions, respect requested session
 length, and never schedule two `intensity: hard` templates back to back.
 
-Selecting for a coached practice picks **one** arrangement for everybody rather than one
-each, because a practice is a whiteboard and a whiteboard has one workout on it. The
+Selection picks **one** arrangement for everybody in the practice rather than one each,
+because a practice is a whiteboard and a whiteboard has one workout on it. The
 arrangement is then resolved per swimmer, so the numbers differ while the shape does not.
 A candidate is only eligible if every swimmer in the practice can be given it safely —
 one the youth distance cap cannot trim is not offered to a practice that includes a youth
@@ -287,9 +288,9 @@ Practice  { id, template_id, date, position, finished, participants[] }
             participant { swimmer_id, resolved_sets, total_distance, position,
                           session_id }
 Session   { id, swimmer_id, template_id, practice_id, date, resolved_sets,
-            total_distance, effort_rating, rated_by: self|coach, completed,
-            fun_rating, set_feedback[], notes }
-            set_feedback { section_index, set_index, effort_rating, rated_by }
+            total_distance, effort_rating, completed, fun_rating,
+            set_feedback[], notes }
+            set_feedback { section_index, set_index, effort_rating }
 TestSet   { id, swimmer_id, date, protocol: 400/200|200/100, t400, t200,
             computed_base_pace }
 Settings  { pool_unit: yards|meters, pool_length }
@@ -305,23 +306,33 @@ add rather than a release.
 A **Practice** is one visit to the pool by one or more swimmers doing one arrangement. It
 exists so a workout in progress survives the phone being locked, handed to somebody else
 or dropped in a bag — today a swim lives in memory and leaving the screen loses it, which
-is indefensible once a coach is holding the only copy of four people's practice. It holds
-each participant's resolved workout and their own position in it, so the coach can move
-between swimmers freely and nobody loses their place. A solo swim is a practice with one
-participant; there is no second code path.
+is indefensible once that phone holds the only copy of four people's practice. It holds
+each participant's resolved workout and their own position in it, so whoever has the
+phone can move between swimmers freely and nobody loses their place. One swimmer is a
+practice with one participant; there is no second code path.
 
-`Practice.position` is where the coach has the practice as a whole, which is the number
-on the wall; a participant's own position is where that swimmer actually is, because
+Participants are not fixed at the start. Somebody who arrives after the warmup joins the
+practice they are already partway through, and somebody who gets out early leaves it —
+both of which write a session for what they actually swam rather than discarding it.
+
+`Practice.position` is where the practice as a whole has got to, which is the number
+being called out; a participant's own position is where that swimmer actually is, because
 somebody always falls behind. A session is written per participant when they finish, so
 history stays per swimmer and the adaptation rules are untouched by any of this.
 
-`Session.rated_by` distinguishes a swimmer's own rating from a coach's observation, and
-`set_feedback` records that one particular set was too hard or too easy — pointing at a
+`set_feedback` records that one particular set was too hard or too easy, pointing at a
 set by its position within that session's own `resolved_sets`, which cannot dangle
-because the sets are stored alongside it. Both are expected to be sparse. Set feedback is
-stored and shown in History and deliberately does **not** feed the adaptation rules yet:
-the rules should be written against real history rather than thresholds invented before
-any exists.
+because the sets are stored alongside it. It is expected to be sparse — most sets get no
+comment, and the ones that do are worth more for it. Set feedback is stored and shown in
+History and deliberately does **not** feed the adaptation rules yet: the rules should be
+written against real history rather than thresholds invented before any exists.
+
+There is deliberately no record of who entered a rating. An earlier draft had one, on the
+grounds that somebody else's observation is not the same signal as a swimmer's own report.
+That is true and it does not help: the device is passed around and cannot tell which it
+got, so the field could only be filled by asking, and a question at the end of every swim
+to populate a column nothing reads yet is a bad trade. A field the app cannot observe
+honestly is worse than no field.
 
 `Session.total_distance` includes the easy-swim equivalent of any time-measured sets, so
 one number remains comparable week to week. That estimate is the answer, not a placeholder:
@@ -345,44 +356,45 @@ import is checked before it is trusted, rather than after it has overwritten som
 
 ## Screens (v1)
 
-1. **Home** — a tile per swimmer on the roster, and a way to start a practice with
-   several of them. Tapping one swimmer is the solo path; choosing several is the
-   coached one.
-2. **Pre-swim** — who is in, session length (30/45/60/75 min) + optional focus. Names the
-   arrangement it chose and why, for the practice as a whole.
+1. **Who is swimming** — a tile per swimmer on the roster, tapped to include them today.
+   One is a practice of one; four is a practice of four. Nothing else distinguishes
+   them. Adding a swimmer happens here too, because the moment you need one is when
+   somebody has just turned up.
+2. **Pre-practice** — session length (30/45/60/75 min) + optional focus. Names the one
+   arrangement it chose for the practice and why.
 3. **Workout view** — the screen that matters. Large high-contrast text readable on a wet
    phone at arm's length. Wake lock on. One set per card, swipe between. Show resolved
-   distances and send-off times, never formulas.
-4. **Practice view** — the coached form of the same screen. The current set across the
-   top, then a row per swimmer showing their numbers for it, since a send-off differs per
-   person and the coach is calling all of them. Tapping a swimmer's row records that this
-   set was too hard or too easy for them; tapping their name opens their own workout, at
-   their own position, and comes back. Nothing here is required: a coach who taps nothing
-   all practice still ends with a workout recorded for everyone.
-5. **Post-swim** — three big rating buttons plus optional note, under 10 seconds. In a
-   practice, once per swimmer, and the coach may answer for them.
-6. **Roster** — add a swimmer, name them, choose adult or youth, set a base pace, remove
-   them. The one screen without which a team cannot exist, and the reason the swimmers
-   are still called Me, Wife and Son.
-7. **History** — sessions per swimmer, total distance, weekly volume chart, and any sets
+   distances and send-off times, never formulas. With more than one swimmer in the
+   practice the card carries a row each, because a send-off differs per person and
+   whoever is calling the set needs all of them at once. Tapping a row records that this
+   set was too hard or too easy for that swimmer; tapping a name opens their own workout
+   at their own position and comes back. None of it is required — a practice where
+   nobody taps anything still ends with a workout recorded for everyone.
+4. **Post-swim** — three big rating buttons plus optional note, under 10 seconds, once
+   per swimmer.
+5. **Roster** — add a swimmer, name them, choose adult or youth, set a base pace, remove
+   them. Reachable from screen 1 rather than buried in settings, because the roster
+   changes at the pool and not at a desk. The one screen without which a team cannot
+   exist, and the reason the swimmers are still called Me, Wife and Son.
+6. **History** — sessions per swimmer, total distance, weekly volume chart, and any sets
    flagged during a practice.
-8. **Settings** — pool unit/length, test set entry, JSON export/import, link to source.
+7. **Settings** — pool unit/length, test set entry, JSON export/import, link to source.
 
-Screens 1, 2, 3 and 5 are built in their solo form. The practice view, the roster and
-History and Settings are not, so a swimmer cannot be named or added, the pool unit is
-whatever seeding set, and a base pace can only be changed by editing storage. A workout
-in progress is held in memory: leaving the workout screen loses it, which is why the wake
-lock matters and why a session is only written once it has been rated. The Practice
-record is what fixes that, and it is a prerequisite for the practice view rather than a
-nicety — a coach holding the only copy of four swimmers' practice cannot lose it to a
-screen lock.
+Screens 1 to 4 are built for a single swimmer. The multi-swimmer half of 1 and 3, the
+roster and History and Settings are not, so a swimmer cannot be named or added, the pool
+unit is whatever seeding set, and a base pace can only be changed by editing storage. A
+workout in progress is held in memory: leaving the workout screen loses it, which is why
+the wake lock matters and why a session is only written once it has been rated. The
+Practice record is what fixes that, and it is a prerequisite for the multi-swimmer card
+rather than a nicety — the phone holding four people's practice is the only copy of it,
+and a screen lock should not be able to end it.
 
 ## Future backend (not v1 — do not build it yet)
 
 A small sync server may follow: a shared template library, syncing the devices on a
-roster, a coach and their swimmers seeing the same practice from different phones. That
-last one is the only reason multi-device matters — a practice on the coach's phone is
-already the whole practice, and sync is what would let a swimmer watch it from their own.
+roster, several phones showing the same practice at once. That last one is the only
+reason multi-device matters — the phone being passed around already holds the whole
+practice, and sync is what would let somebody follow it from their own.
 Keep the door open without building it:
 
 - All business logic (parser, resolver, adaptation rules) lives in `src/core/` as pure
@@ -419,8 +431,8 @@ Which caps apply is decided by one flag on the swimmer, chosen when they are add
 roster. That makes it a setting someone can get wrong, so the roster screen asks plainly
 and the flag is what every rule reads. There is no date of birth to infer it from and no
 second place where age is interpreted, which is the point: one answer, given once, read
-everywhere. In a coached practice the caps are the
-strictest of everyone present for anything shared: an arrangement no youth swimmer can be
+everywhere. Across a practice the caps are the
+strictest of everyone in it for anything shared: an arrangement no youth swimmer can be
 given safely is not offered to a practice containing one, even though the adults in it
 could swim it. Each swimmer's own resolved workout is then capped for them individually,
 so an adult in that practice is not held to a child's limits.
