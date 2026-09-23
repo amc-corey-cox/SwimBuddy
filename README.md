@@ -1,17 +1,18 @@
 # Swim Buddy
 
-Swim Buddy writes each swimmer in a family their own workout, shows it one set at a time
-in type you can read through goggles, and uses how the last swim felt to decide what the
-next one should be.
+Swim Buddy writes each swimmer their own workout, shows it one set at a time in type you
+can read through goggles, and uses how the last swim felt to decide what the next one
+should be.
 
 ## Why this exists
 
-Three people who swim together are rarely the same swimmer. One is ex-swim-team and
-thirty years out of the water and wants real sets; one swims for fitness; one is eleven
-and will quietly stop turning up if it feels like a grind. The same workout on the
-whiteboard is either too much for somebody or too little for somebody else, and writing
-three of them by hand before every session is the kind of thing that happens twice and
-then stops.
+People who swim together are rarely the same swimmer. In one family that is an
+ex-swim-team adult thirty years out of the water who wants real sets, someone who swims
+for fitness, and an eleven-year-old who will quietly stop turning up if it feels like a
+grind. In a masters lane or a small squad it is the same problem with more people in it.
+The same workout on the whiteboard is either too much for somebody or too little for
+somebody else, and writing one per swimmer by hand before every session is the kind of
+thing that happens twice and then stops.
 
 So the workouts are written once, relative to each swimmer rather than in absolute
 seconds, and the app does the arithmetic per person. A set that reads `8x100 free @
