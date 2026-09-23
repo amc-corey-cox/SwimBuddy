@@ -1,5 +1,5 @@
 import { el, button } from '../dom'
-import type { Selection } from '../../core/selection'
+import type { PracticeSelection } from '../../core/selection'
 import type { Swimmer } from '../../core/types'
 
 /** The session lengths the spec offers. */
@@ -19,9 +19,9 @@ export interface PreSwimHandlers {
  * answer — that is the whole reason selection returns its reasons.
  */
 export function preSwimScreen(
-  swimmer: Swimmer,
+  swimmers: readonly Swimmer[],
   minutes: number,
-  selection: Selection | undefined,
+  selection: PracticeSelection | undefined,
   adaptationReasons: readonly string[],
   handlers: PreSwimHandlers,
 ): HTMLElement {
@@ -58,8 +58,15 @@ export function preSwimScreen(
 
   return el('section', { class: 'screen', 'data-testid': 'screen-pre-swim' }, [
     button('‹ Back', handlers.onBack, { class: 'link', 'data-testid': 'back' }),
-    el('h1', {}, [`${swimmer.name}'s swim`]),
+    el('h1', {}, [headline(swimmers)]),
     el('div', { class: 'chips' }, lengths),
     ...preview,
   ])
+}
+
+/** Whose swim this is: one name, or how many are in the practice. */
+function headline(swimmers: readonly Swimmer[]): string {
+  const first = swimmers[0]
+  if (swimmers.length === 1 && first !== undefined) return `${first.name}'s swim`
+  return `${String(swimmers.length)} swimmers`
 }

@@ -58,7 +58,6 @@ describe('erasing the database', () => {
     await first.put('swimmers', {
       id: 'a0000000-0000-4000-8000-00000000000a',
       name: 'Rowan',
-      birth_year: 1979,
       base_pace_by_stroke: { free: 95 },
       load_factor: 1.0,
       is_youth: false,

@@ -51,15 +51,17 @@ test('opens IndexedDB and seeds the household on first run', async ({ page }) =>
   // works in a real browser engine.
   await page.goto('/SwimBuddy/')
 
-  await expect(page.getByTestId('screen-home').getByRole('button')).toHaveCount(3)
+  // Counts the swimmer tiles rather than every button on the screen, so adding
+  // a control to the home screen does not read as a seeding bug.
+  await expect(page.locator('[data-testid^="swimmer-"]')).toHaveCount(3)
 })
 
 test('seeding does not duplicate when the app is reloaded', async ({ page }) => {
   await page.goto('/SwimBuddy/')
-  await expect(page.getByTestId('screen-home').getByRole('button')).toHaveCount(3)
+  await expect(page.locator('[data-testid^="swimmer-"]')).toHaveCount(3)
 
   await page.reload()
-  await expect(page.getByTestId('screen-home').getByRole('button')).toHaveCount(3)
+  await expect(page.locator('[data-testid^="swimmer-"]')).toHaveCount(3)
 })
 
 test('content stays inside the viewport on a phone', async ({ page }, testInfo) => {

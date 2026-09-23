@@ -69,7 +69,27 @@ export function estimateMinutes(distance: number, swimmer: Swimmer): number {
   return Math.round(((distance / 100) * perHundred) / 60)
 }
 
-export function selectTemplate(context: SelectionContext): Selection | undefined {
+/** One template a swimmer could be given today, with how well it suits them. */
+interface Candidate {
+  readonly template: Template
+  readonly minutes: number
+  readonly score: number
+}
+
+interface Evaluation {
+  readonly candidates: readonly Candidate[]
+  readonly recentTags: ReadonlySet<string>
+  readonly flags: { lastWasHard: boolean; returning: boolean; wantsFun: boolean }
+}
+
+/**
+ * Every template this swimmer could be offered, scored.
+ *
+ * Split out of `selectTemplate` so a practice can ask the same question of
+ * several swimmers and compare the answers. Choosing for a group is not a
+ * different rule set — it is these rules, run per swimmer, reconciled after.
+ */
+function evaluate(context: SelectionContext): Evaluation {
   const { swimmer, templates, recentSessions, now } = context
   const caps = capsFor(swimmer)
 
@@ -110,23 +130,139 @@ export function selectTemplate(context: SelectionContext): Selection | undefined
     // a refusal, not a preference.
     .filter(({ template }) => !(lastWasHard && template.intensity === 'hard'))
 
-  const best = candidates
-    .map((candidate) => ({
-      ...candidate,
-      score: score(candidate.template, candidate.minutes, targetMinutes, recentTags, wantsFun),
-    }))
-    .sort((a, b) => b.score - a.score || a.template.id.localeCompare(b.template.id))[0]
+  return {
+    candidates: candidates.map(({ template, minutes }) => ({
+      template,
+      minutes,
+      score: score(template, minutes, targetMinutes, recentTags, wantsFun),
+    })),
+    recentTags,
+    flags: { lastWasHard, returning, wantsFun },
+  }
+}
+
+export function selectTemplate(context: SelectionContext): Selection | undefined {
+  const { candidates, recentTags, flags } = evaluate(context)
+
+  const best = [...candidates].sort(
+    (a, b) => b.score - a.score || a.template.id.localeCompare(b.template.id),
+  )[0]
 
   if (best === undefined) return undefined
 
   return {
     template: best.template,
     estimated_minutes: best.minutes,
-    reasons: reasonsFor(best.template, best.minutes, recentTags, {
-      lastWasHard,
-      returning,
-      wantsFun,
+    reasons: reasonsFor(best.template, best.minutes, recentTags, flags),
+  }
+}
+
+/** One swimmer's share of a practice: who they are and what they have been doing. */
+export interface PracticeSwimmer {
+  readonly swimmer: Swimmer
+  /** That swimmer's sessions, newest first. */
+  readonly recentSessions: readonly Session[]
+  readonly weeklyDistanceBudget?: number
+}
+
+export interface PracticeSelectionContext {
+  readonly swimmers: readonly PracticeSwimmer[]
+  readonly templates: readonly Template[]
+  readonly requestedMinutes: number
+  readonly now: Timestamp
+}
+
+export interface PracticeSelection {
+  readonly template: Template
+  readonly reasons: readonly string[]
+  /** How long the practice takes, which is how long its slowest swimmer takes. */
+  readonly estimated_minutes: number
+}
+
+/**
+ * One arrangement for everybody, rather than one each.
+ *
+ * A practice is a whiteboard and a whiteboard has one workout on it. So a
+ * template has to clear every swimmer's eligibility — the youth distance cap,
+ * the week's remaining budget, no two hard sessions running — and is then
+ * scored by whoever it suits *worst*. One person who swam hard yesterday is
+ * enough to steer the whole practice off a hard set, which is the intended
+ * behaviour and not a rounding error: the alternative is handing somebody a
+ * session the rules already said they should not have.
+ *
+ * Resolution stays per swimmer, so the shape is shared and the numbers are not.
+ */
+export function selectForPractice(
+  context: PracticeSelectionContext,
+): PracticeSelection | undefined {
+  const evaluations = context.swimmers.map((entry) => ({
+    swimmer: entry.swimmer,
+    evaluation: evaluate({
+      swimmer: entry.swimmer,
+      templates: context.templates,
+      recentSessions: entry.recentSessions,
+      requestedMinutes: context.requestedMinutes,
+      now: context.now,
+      ...(entry.weeklyDistanceBudget === undefined
+        ? {}
+        : { weeklyDistanceBudget: entry.weeklyDistanceBudget }),
     }),
+  }))
+
+  const first = evaluations[0]
+  if (first === undefined) return undefined
+
+  const shared = first.evaluation.candidates
+    .map((candidate) => {
+      // Every swimmer has to have this template among their own candidates. One
+      // missing it means somebody would be handed something their rules refused.
+      const scored: { entry: (typeof evaluations)[number]; candidate: Candidate }[] = []
+      for (const entry of evaluations) {
+        const found = entry.evaluation.candidates.find(
+          (each) => each.template.id === candidate.template.id,
+        )
+        if (found === undefined) return undefined
+        scored.push({ entry, candidate: found })
+      }
+
+      // `evaluations` is non-empty — checked above — so `scored` is too, which is
+      // why this reduces rather than sorting and indexing. The swimmer an
+      // arrangement suits worst is the one who decides whether it is offered.
+      const worst = scored.reduce((a, b) => (b.candidate.score < a.candidate.score ? b : a))
+
+      return {
+        template: candidate.template,
+        worst,
+        minutes: Math.max(...scored.map((each) => each.candidate.minutes)),
+      }
+    })
+    .filter((entry): entry is NonNullable<typeof entry> => entry !== undefined)
+
+  const best = [...shared].sort(
+    (a, b) =>
+      b.worst.candidate.score - a.worst.candidate.score ||
+      a.template.id.localeCompare(b.template.id),
+  )[0]
+
+  if (best === undefined) return undefined
+
+  const binding = best.worst.entry
+  const solo = context.swimmers.length === 1
+
+  return {
+    template: best.template,
+    estimated_minutes: best.minutes,
+    reasons: [
+      solo
+        ? 'One swimmer in this practice.'
+        : `Chosen to suit all ${String(context.swimmers.length)} swimmers.`,
+      ...reasonsFor(
+        best.template,
+        best.worst.candidate.minutes,
+        binding.evaluation.recentTags,
+        binding.evaluation.flags,
+      ).map((reason) => (solo ? reason : `${binding.swimmer.name}: ${reason}`)),
+    ],
   }
 }
 
