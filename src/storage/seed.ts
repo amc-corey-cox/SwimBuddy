@@ -5,11 +5,12 @@ import { SHIPPED_TEMPLATES } from '../core/templates'
 import type { CatalogueCollection, RecordInput, SwimBuddyStore } from './store'
 
 /**
- * The household from CLAUDE.md: two adults and one youth swimmer.
+ * Three swimmers to start with: two adults and one youth.
  *
- * These are placeholders meant to be edited on the Settings screen (build order
- * step 6), not real people. Names come from the spec's own Users table, and no
- * real family data belongs in a public repository.
+ * The shape is the point rather than the people — a roster with somebody on it
+ * is something to press, and an empty one is a form. The names are obvious
+ * placeholders so that renaming them on the roster screen is clearly the first
+ * thing to do, and no real family data belongs in a public repository.
  *
  * Base paces are provisional: a real one comes from a timed test set. Since no
  * TestSet row exists for a freshly seeded swimmer, the app can tell the
@@ -22,9 +23,9 @@ export interface SeedSwimmer {
 }
 
 export const SEED_SWIMMERS: readonly SeedSwimmer[] = [
-  { name: 'Me', provisional_base_pace: 120, is_youth: false },
-  { name: 'Wife', provisional_base_pace: 130, is_youth: false },
-  { name: 'Son', provisional_base_pace: 135, is_youth: true },
+  { name: 'Swimmer 1', provisional_base_pace: 120, is_youth: false },
+  { name: 'Swimmer 2', provisional_base_pace: 130, is_youth: false },
+  { name: 'Swimmer 3', provisional_base_pace: 135, is_youth: true },
 ]
 
 export interface SeedResult {

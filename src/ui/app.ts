@@ -7,7 +7,7 @@ import { workoutScreen, type Participant } from './screens/workout'
 import { postSwimScreen, type PostSwimAnswers } from './screens/postSwim'
 import { keepScreenAwake, type WakeLock } from './wakeLock'
 import { adapt, type Adaptation } from '../core/adaptation'
-import { resolveTemplate } from '../core/resolver'
+import { resolvePractice } from '../core/practice'
 import { selectForPractice, type PracticeSelection } from '../core/selection'
 import type { EffortRating, Settings, Swimmer, Template, Uuid } from '../core/types'
 import type { SwimBuddyStore } from '../storage/store'
@@ -231,18 +231,24 @@ export async function startApp(options: AppOptions): Promise<void> {
               name: 'workout',
               practice: {
                 template: selection.template,
-                members: chosen.map((swimmer) => {
-                  const adaptation = adaptations.get(swimmer.id)
-                  const budget = adaptation?.weekly_distance_budget
-                  return {
-                    swimmer,
-                    workout: resolveTemplate(selection.template, swimmer, {
-                      loadFactor: adaptation?.load_factor ?? swimmer.load_factor,
-                      sendOffBonusSeconds: adaptation?.send_off_bonus_seconds ?? 0,
-                      ...(budget === undefined || budget === null ? {} : { maxDistance: budget }),
-                    }),
-                  }
-                }),
+                // Resolved together rather than one at a time: a faster swimmer
+                // gets more repetitions instead of standing on the wall waiting
+                // for everybody else to finish the same set.
+                members: resolvePractice(
+                  selection.template,
+                  chosen.map((swimmer) => {
+                    const adaptation = adaptations.get(swimmer.id)
+                    const budget = adaptation?.weekly_distance_budget
+                    return {
+                      swimmer,
+                      options: {
+                        loadFactor: adaptation?.load_factor ?? swimmer.load_factor,
+                        sendOffBonusSeconds: adaptation?.send_off_bonus_seconds ?? 0,
+                        ...(budget === undefined || budget === null ? {} : { maxDistance: budget }),
+                      },
+                    }
+                  }),
+                ).map(({ swimmer, workout }) => ({ swimmer, workout })),
                 flags: new Map(),
               },
               index: 0,

@@ -211,7 +211,7 @@ function strokeFor(part: SetPart): StrokeGroup | undefined {
 }
 
 /** The distance a set is worth, counting a timed part as the easy swim it stands in for. */
-function setDistance(set: ResolvedSet, swimmer: Swimmer): number {
+export function setDistance(set: ResolvedSet, swimmer: Swimmer): number {
   const perRep = set.parts.reduce((total, part) => total + extentDistance(part.extent, swimmer), 0)
   return perRep * set.reps
 }
