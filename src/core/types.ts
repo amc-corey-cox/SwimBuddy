@@ -89,4 +89,4 @@ export const STROKE_OFFSETS: Readonly<Record<Exclude<StrokeGroup, 'free'>, numbe
 }
 
 /** Bumped whenever a migration is added. Kept in step with `DATABASE_VERSION`. */
-export const SCHEMA_VERSION = 3
+export const SCHEMA_VERSION = 2
