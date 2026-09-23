@@ -10,9 +10,9 @@ Where the project is going and in what order. The spec for each step lives in
 5. Resolver: template + swimmer → concrete workout.
 6. Workout view screen (+ wake lock, + service worker offline).
 7. Post-swim rating + adaptation rules + tests.
-8. Roster: add, name and remove swimmers, and choose adult or youth, at the pool.
+8. ~~Roster: add, name and remove swimmers, and choose adult or youth, at the pool.~~ Done.
 9. Practice: one arrangement resolved per swimmer, held in storage rather than memory.
-10. The multi-swimmer card: every swimmer's numbers for the current set, on one screen.
+10. ~~The multi-swimmer card: every swimmer's numbers for the current set, on one screen.~~ Done.
 11. Per-set feedback — capture and storage now, adaptation rules later.
 12. History + JSON export/import.
 13. Test set flow.

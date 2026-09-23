@@ -258,6 +258,16 @@ Rules:
 Template selection: prefer tags unused in the last 3 sessions, respect requested session
 length, and never schedule two `intensity: hard` templates back to back.
 
+Swimmers in one practice have different base paces, so the same set takes them different
+lengths of time. Rather than let the faster swimmer finish and wait, the set is treated as
+a block of time and the repetitions that fill it are resolved per swimmer, exactly as the
+send-off already is: the slowest swimmer sets the length and everybody else is brought up
+to it. Nobody's workout is shortened, and a set may not grow past double what the author
+wrote — past that the faster swimmer simply gets the rest, because a 6x100 that became a
+14x100 is a different set from the one in the library. The safety caps still bind: adding
+repetitions is exactly how a youth swimmer would go over the distance cap, so one who
+would breach it gets the rest instead.
+
 Selection picks **one** arrangement for everybody in the practice rather than one each,
 because a practice is a whiteboard and a whiteboard has one workout on it. The
 arrangement is then resolved per swimmer, so the numbers differ while the shape does not.
