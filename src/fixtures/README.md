@@ -18,7 +18,7 @@ They exist to serve three jobs:
 2. **PR previews** — the preview build seeds the UI from `demoStore()`, so a
    preview shows a populated app rather than an empty one.
 3. **Storage round-trip tests** — `demoStore()` is already the shape of the JSON
-   export file, so step 8 can export, wipe, import, and compare.
+   export file, so the export/import step can export, wipe, import, and compare.
 
 `fixtures.test.ts` enforces the invariants that keep this data honest: valid
 unique UUIDs, referential integrity, youth caps, distances that are multiples of

@@ -1,17 +1,18 @@
 # Swim Buddy
 
-Swim Buddy writes each swimmer in a family their own workout, shows it one set at a time
-in type you can read through goggles, and uses how the last swim felt to decide what the
-next one should be.
+Swim Buddy writes each swimmer their own workout, shows it one set at a time in type you
+can read through goggles, and uses how the last swim felt to decide what the next one
+should be.
 
 ## Why this exists
 
-Three people who swim together are rarely the same swimmer. One is ex-swim-team and
-thirty years out of the water and wants real sets; one swims for fitness; one is eleven
-and will quietly stop turning up if it feels like a grind. The same workout on the
-whiteboard is either too much for somebody or too little for somebody else, and writing
-three of them by hand before every session is the kind of thing that happens twice and
-then stops.
+People who swim together are rarely the same swimmer. In one family that is an
+ex-swim-team adult thirty years out of the water who wants real sets, someone who swims
+for fitness, and an eleven-year-old who will quietly stop turning up if it feels like a
+grind. In a masters lane or a small squad it is the same problem with more people in it.
+The same workout on the whiteboard is either too much for somebody or too little for
+somebody else, and writing one per swimmer by hand before every session is the kind of
+thing that happens twice and then stops.
 
 So the workouts are written once, relative to each swimmer rather than in absolute
 seconds, and the app does the arithmetic per person. A set that reads `8x100 free @
@@ -117,15 +118,21 @@ one changes. Offline works. Installing works.
 
 Not built yet, in rough order of how much you will miss them:
 
-- **Settings**, so the three swimmers are still called Me, Wife and Son, the pool unit is
-  whatever it was seeded as, and a base pace cannot be changed from inside the app.
+- **The roster**, so swimmers cannot be added, renamed or marked adult or youth. The
+  three that exist are still called Me, Wife and Son.
+- **Swimming together**, where one phone gets passed around a practice — everybody on the
+  same workout resolved to their own numbers, with whoever is holding it recording how
+  each of them is going.
+- **Settings**, so the pool unit is whatever it was seeded as and a base pace cannot be
+  changed from inside the app.
 - **History**, so a past session is recorded but cannot be looked at.
 - **The test set flow**, so base paces are provisional numbers rather than measured ones.
   The app knows they are provisional and can tell the difference.
-- **Swimming together**, meaning several workouts in progress at once on one phone,
-  handed round between swimmers.
 - **Per-set feedback**, for saying that one particular set was too hard rather than
   rating the whole session.
+
+A workout in progress also lives in memory rather than storage, so leaving the screen
+loses it. That is the first thing the practice work fixes.
 
 ## Development
 
