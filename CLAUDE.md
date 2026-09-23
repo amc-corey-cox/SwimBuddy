@@ -14,7 +14,7 @@ that looks plausible and is wrong.
 - [`docs/spec.md`](docs/spec.md) — users, screens, base pace, template grammar, adaptation
   rules, data model, youth safety caps
 - [`docs/roadmap.md`](docs/roadmap.md) — build order and where we are
-- [`README.md`](README.md) — commands, CI, previews, deploys
+- [`docs/development.md`](docs/development.md) — commands, CI, previews, deploys
 
 ## Dev loop constraints (important)
 
