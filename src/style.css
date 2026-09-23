@@ -258,3 +258,77 @@ h1 {
   color: var(--muted);
   text-transform: capitalize;
 }
+
+/* --- Roster ---------------------------------------------------------------
+   Dense on purpose: the whole point is changing it at the pool with one hand,
+   so every swimmer is one row and nothing is behind a menu. */
+
+.roster-row,
+.roster-add {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.roster-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.roster-name,
+.roster-pace {
+  padding: 0.5rem 0.6rem;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 0.4rem;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--fg);
+  font: inherit;
+}
+
+.roster-name {
+  width: 100%;
+}
+
+.roster-pace {
+  width: 5rem;
+}
+
+.roster-pace-label {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.link.danger {
+  color: var(--danger);
+  margin-left: auto;
+}
+
+/* --- A practice -----------------------------------------------------------
+   One card per swimmer for the set everybody is on. The name leads, because at
+   the end of a lane you are looking for a person before you are looking for a
+   number. */
+
+.swimmer-name {
+  margin: 0 0 0.25rem;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.headline-small {
+  margin: 0.1rem 0;
+  font-size: 1.6rem;
+  font-weight: 700;
+}
+
+.card-done {
+  opacity: 0.55;
+}
+
+.tile-on {
+  outline: 3px solid var(--accent);
+}

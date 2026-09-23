@@ -2,41 +2,42 @@ import { clear, el } from './dom'
 import { distance } from './format'
 import { homeScreen } from './screens/home'
 import { preSwimScreen } from './screens/preSwim'
-import { workoutScreen } from './screens/workout'
+import { rosterScreen, type RosterDraft } from './screens/roster'
+import { workoutScreen, type Participant } from './screens/workout'
 import { postSwimScreen, type PostSwimAnswers } from './screens/postSwim'
 import { keepScreenAwake, type WakeLock } from './wakeLock'
 import { adapt, type Adaptation } from '../core/adaptation'
 import { resolveTemplate } from '../core/resolver'
-import { selectTemplate, type Selection } from '../core/selection'
-import type { ResolvedWorkout, Settings, Swimmer, Template } from '../core/types'
+import { selectForPractice, type PracticeSelection } from '../core/selection'
+import type { EffortRating, Settings, Swimmer, Template, Uuid } from '../core/types'
 import type { SwimBuddyStore } from '../storage/store'
 
 /**
- * The app, as a state machine over four screens.
+ * The app, as a state machine over the screens.
  *
  * Deliberately one small object rather than a framework: the whole of Swim Buddy
- * is pick a swimmer, pick a length, swim it, say how it went. Everything that
- * decides anything lives in src/core and is unit tested; this only decides what
- * is on screen.
+ * is pick who is swimming, pick a length, swim it, say how it went. Everything
+ * that decides anything lives in src/core and is unit tested; this only decides
+ * what is on screen.
  *
- * The resolved workout is held in memory for the length of the swim. Leaving
- * mid-workout loses it, which is why the wake lock matters and why a workout is
- * only written to storage once it has been rated.
+ * A practice is held in memory for its duration. Leaving mid-practice loses it,
+ * which is why the wake lock matters — moving it into storage is the next step
+ * and the reason the Practice record exists in the spec.
  */
+
+interface Practice {
+  readonly template: Template
+  readonly members: readonly Participant[]
+  /** Set feedback, keyed by swimmer then by the set's position in their workout. */
+  readonly flags: Map<Uuid, Map<string, EffortRating>>
+}
+
 type Screen =
   | { readonly name: 'home' }
-  | { readonly name: 'pre-swim'; readonly swimmer: Swimmer; readonly minutes: number }
-  | {
-      readonly name: 'workout'
-      readonly swimmer: Swimmer
-      readonly workout: ResolvedWorkout
-      readonly index: number
-    }
-  | {
-      readonly name: 'post-swim'
-      readonly swimmer: Swimmer
-      readonly workout: ResolvedWorkout
-    }
+  | { readonly name: 'roster' }
+  | { readonly name: 'pre-swim'; readonly swimmers: readonly Swimmer[]; readonly minutes: number }
+  | { readonly name: 'workout'; readonly practice: Practice; readonly index: number }
+  | { readonly name: 'post-swim'; readonly practice: Practice; readonly rated: number }
 
 export interface AppOptions {
   readonly store: SwimBuddyStore
@@ -46,17 +47,23 @@ export interface AppOptions {
 
 const DEFAULT_MINUTES = 45
 
+/** The provisional pace a new swimmer starts on, until a test set measures one. */
+const DEFAULT_BASE_PACE_SECONDS = 120
+
 export async function startApp(options: AppOptions): Promise<void> {
   const { store, mount } = options
   const now = options.now ?? (() => Date.now())
 
-  const [swimmers, templates, settings] = await Promise.all([
+  const [initialSwimmers, templates, settings] = await Promise.all([
     store.swimmers.list(),
     store.templates.list(),
     store.getSettings(),
   ])
 
+  let swimmers = initialSwimmers
+
   let screen: Screen = { name: 'home' }
+  let selected = new Set<Uuid>(swimmers.length === 1 ? swimmers.map((each) => each.id) : [])
   let wakeLock: WakeLock | undefined
 
   /**
@@ -75,38 +82,59 @@ export async function startApp(options: AppOptions): Promise<void> {
   }
 
   async function planFor(
-    swimmer: Swimmer,
+    chosen: readonly Swimmer[],
     minutes: number,
-  ): Promise<{ selection: Selection | undefined; adaptation: Adaptation }> {
-    const stored = await store.sessions.forSwimmer(swimmer.id)
-    const recentSessions = [...stored].sort((a, b) => b.date - a.date)
-
+  ): Promise<{
+    selection: PracticeSelection | undefined
+    adaptations: ReadonlyMap<Uuid, Adaptation>
+  }> {
     // One reading of the clock for the whole plan. Two would let adaptation and
     // selection land either side of a week boundary and disagree about the same
     // swimmer, which is the sort of bug that only shows up on a Sunday night.
     const at = now()
-    const adaptation = adapt(swimmer, recentSessions, at)
 
-    const selection = selectTemplate({
-      // Selection sees the adapted swimmer, not the stored one: how much work
-      // they are up for today is what decides which template fits the time.
-      swimmer: { ...swimmer, load_factor: adaptation.load_factor },
+    const histories = await Promise.all(
+      chosen.map(async (swimmer) => {
+        const stored = await store.sessions.forSwimmer(swimmer.id)
+        return { swimmer, sessions: [...stored].sort((a, b) => b.date - a.date) }
+      }),
+    )
+
+    const adaptations = new Map<Uuid, Adaptation>(
+      histories.map(({ swimmer, sessions }) => [swimmer.id, adapt(swimmer, sessions, at)]),
+    )
+
+    const selection = selectForPractice({
+      swimmers: histories.map(({ swimmer, sessions }) => {
+        const adaptation = adaptations.get(swimmer.id)
+        const budget = adaptation?.weekly_distance_budget
+        return {
+          // Selection sees the adapted swimmer, not the stored one: how much
+          // work they are up for today is what decides which arrangement fits.
+          swimmer: { ...swimmer, load_factor: adaptation?.load_factor ?? swimmer.load_factor },
+          recentSessions: sessions,
+          ...(budget === undefined || budget === null ? {} : { weeklyDistanceBudget: budget }),
+        }
+      }),
       templates,
-      recentSessions,
       requestedMinutes: minutes,
       now: at,
-      ...(adaptation.weekly_distance_budget === null
-        ? {}
-        : { weeklyDistanceBudget: adaptation.weekly_distance_budget }),
     })
 
-    return { selection, adaptation }
+    return { selection, adaptations }
   }
 
   function go(next: Screen): void {
     if (next.name !== 'workout') releaseWakeLock()
     screen = next
     void render()
+  }
+
+  async function refreshSwimmers(): Promise<void> {
+    swimmers = await store.swimmers.list()
+    // A swimmer removed while selected would otherwise start a practice that
+    // cannot be resolved for them.
+    selected = new Set([...selected].filter((id) => swimmers.some((each) => each.id === id)))
   }
 
   async function render(): Promise<void> {
@@ -116,22 +144,83 @@ export async function startApp(options: AppOptions): Promise<void> {
 
     if (current.name === 'home') {
       mount.append(
-        homeScreen(swimmers, (swimmer) => {
-          go({ name: 'pre-swim', swimmer, minutes: DEFAULT_MINUTES })
+        homeScreen(
+          swimmers,
+          selected,
+          (swimmer) => {
+            if (selected.has(swimmer.id)) selected.delete(swimmer.id)
+            else selected.add(swimmer.id)
+            void render()
+          },
+          {
+            onStart: (chosen) => {
+              go({ name: 'pre-swim', swimmers: chosen, minutes: DEFAULT_MINUTES })
+            },
+            onRoster: () => {
+              go({ name: 'roster' })
+            },
+          },
+        ),
+      )
+      return
+    }
+
+    if (current.name === 'roster') {
+      mount.append(
+        rosterScreen(swimmers, {
+          onAdd: (draft: RosterDraft) => {
+            void store.swimmers
+              .create({
+                name: draft.name,
+                base_pace_by_stroke: { free: draft.base_pace_seconds || DEFAULT_BASE_PACE_SECONDS },
+                load_factor: 1.0,
+                is_youth: draft.is_youth,
+              })
+              .then(refreshSwimmers)
+              .then(render)
+          },
+          onRename: (swimmer, name) => {
+            void store.swimmers.update(swimmer.id, { name }).then(refreshSwimmers).then(render)
+          },
+          onSetYouth: (swimmer, isYouth) => {
+            void store.swimmers
+              .update(swimmer.id, { is_youth: isYouth })
+              .then(refreshSwimmers)
+              .then(render)
+          },
+          onSetBasePace: (swimmer, seconds) => {
+            void store.swimmers
+              .update(swimmer.id, {
+                base_pace_by_stroke: { ...swimmer.base_pace_by_stroke, free: seconds },
+              })
+              .then(refreshSwimmers)
+              .then(render)
+          },
+          onRemove: (swimmer) => {
+            void store.swimmers.remove(swimmer.id).then(refreshSwimmers).then(render)
+          },
+          onDone: () => {
+            go({ name: 'home' })
+          },
         }),
       )
       return
     }
 
     if (current.name === 'pre-swim') {
-      const { swimmer, minutes } = current
-      const { selection, adaptation } = await planFor(swimmer, minutes)
+      const { swimmers: chosen, minutes } = current
+      const { selection, adaptations } = await planFor(chosen, minutes)
       if (token !== renderToken) return
 
+      const adaptationReasons = chosen.flatMap((swimmer) => {
+        const reasons = adaptations.get(swimmer.id)?.reasons ?? []
+        return chosen.length === 1 ? reasons : reasons.map((r) => `${swimmer.name}: ${r}`)
+      })
+
       mount.append(
-        preSwimScreen(swimmer, minutes, selection, adaptation.reasons, {
+        preSwimScreen(chosen, minutes, selection, adaptationReasons, {
           onLengthChange: (next) => {
-            go({ name: 'pre-swim', swimmer, minutes: next })
+            go({ name: 'pre-swim', swimmers: chosen, minutes: next })
           },
           onBack: () => {
             go({ name: 'home' })
@@ -140,14 +229,22 @@ export async function startApp(options: AppOptions): Promise<void> {
             if (selection === undefined) return
             go({
               name: 'workout',
-              swimmer,
-              workout: resolveTemplate(selection.template, swimmer, {
-                loadFactor: adaptation.load_factor,
-                sendOffBonusSeconds: adaptation.send_off_bonus_seconds,
-                ...(adaptation.weekly_distance_budget === null
-                  ? {}
-                  : { maxDistance: adaptation.weekly_distance_budget }),
-              }),
+              practice: {
+                template: selection.template,
+                members: chosen.map((swimmer) => {
+                  const adaptation = adaptations.get(swimmer.id)
+                  const budget = adaptation?.weekly_distance_budget
+                  return {
+                    swimmer,
+                    workout: resolveTemplate(selection.template, swimmer, {
+                      loadFactor: adaptation?.load_factor ?? swimmer.load_factor,
+                      sendOffBonusSeconds: adaptation?.send_off_bonus_seconds ?? 0,
+                      ...(budget === undefined || budget === null ? {} : { maxDistance: budget }),
+                    }),
+                  }
+                }),
+                flags: new Map(),
+              },
               index: 0,
             })
           },
@@ -157,40 +254,69 @@ export async function startApp(options: AppOptions): Promise<void> {
     }
 
     if (current.name === 'workout') {
-      const { swimmer, workout, index } = current
+      const { practice, index } = current
       wakeLock ??= keepScreenAwake()
 
+      const flagsHere = new Map<Uuid, EffortRating>()
+      for (const [swimmerId, byPosition] of practice.flags) {
+        const rating = byPosition.get(String(index))
+        if (rating !== undefined) flagsHere.set(swimmerId, rating)
+      }
+
       mount.append(
-        workoutScreen(workout, settings, index, {
+        workoutScreen(practice.members, settings, index, flagsHere, {
           onStep: (next) => {
-            go({ name: 'workout', swimmer, workout, index: next })
+            go({ name: 'workout', practice, index: next })
           },
           onFinish: () => {
-            go({ name: 'post-swim', swimmer, workout })
+            go({ name: 'post-swim', practice, rated: 0 })
+          },
+          onFlag: (swimmer, rating) => {
+            const byPosition = practice.flags.get(swimmer.id) ?? new Map<string, EffortRating>()
+            if (rating === undefined) byPosition.delete(String(index))
+            else byPosition.set(String(index), rating)
+            practice.flags.set(swimmer.id, byPosition)
+            void render()
           },
         }),
       )
       return
     }
 
-    const { swimmer, workout } = current
+    const { practice, rated } = current
+    const member = practice.members[rated]
+
+    // Everyone has been rated, so the practice is over. The selection goes with
+    // it: leaving the tiles lit means the next tap turns somebody off rather
+    // than starting the next practice, which reads as the app ignoring you.
+    if (member === undefined) {
+      selected = new Set()
+      go({ name: 'home' })
+      return
+    }
+
     mount.append(
       el('p', { class: 'muted', 'data-testid': 'swum' }, [
-        distance(workout.total_distance, settings.pool_unit),
+        distance(member.workout.total_distance, settings.pool_unit),
       ]),
-      postSwimScreen(swimmer, (answers) => {
-        void finish(swimmer, workout, answers).then(() => {
-          go({ name: 'home' })
+      postSwimScreen(member.swimmer, (answers) => {
+        void finish(practice, rated, answers).then(() => {
+          go({ name: 'post-swim', practice, rated: rated + 1 })
         })
       }),
     )
   }
 
   async function finish(
-    swimmer: Swimmer,
-    workout: ResolvedWorkout,
+    practice: Practice,
+    index: number,
     answers: PostSwimAnswers,
   ): Promise<void> {
+    const member = practice.members[index]
+    if (member === undefined) return
+
+    const { swimmer, workout } = member
+
     await store.sessions.create({
       swimmer_id: swimmer.id,
       template_id: workout.template_id,
@@ -200,7 +326,7 @@ export async function startApp(options: AppOptions): Promise<void> {
       effort_rating: answers.effort,
       completed: answers.completed,
       ...(answers.fun === undefined ? {} : { fun_rating: answers.fun }),
-      notes: '',
+      notes: notesFrom(practice, swimmer.id),
     })
 
     // The rating only means something if it reaches the next swim. Recomputing
@@ -215,13 +341,31 @@ export async function startApp(options: AppOptions): Promise<void> {
 
     if (next.load_factor !== swimmer.load_factor) {
       const updated = await store.swimmers.update(swimmer.id, { load_factor: next.load_factor })
-      const index = swimmers.findIndex((each) => each.id === swimmer.id)
-      if (index >= 0) swimmers[index] = updated
+      const at = swimmers.findIndex((each) => each.id === swimmer.id)
+      if (at >= 0) swimmers[at] = updated
     }
+  }
+
+  /**
+   * Set feedback, written into the session's notes.
+   *
+   * The model has nowhere structured to put this yet — `set_feedback` is
+   * specified and not built. Notes keep the signal rather than dropping it on
+   * the floor while the field is added, and History will read it either way.
+   */
+  function notesFrom(practice: Practice, swimmerId: Uuid): string {
+    const byPosition = practice.flags.get(swimmerId)
+    if (byPosition === undefined || byPosition.size === 0) return ''
+
+    return [...byPosition.entries()]
+      .sort((a, b) => Number(a[0]) - Number(b[0]))
+      .map(
+        ([position, rating]) => `Set ${String(Number(position) + 1)}: ${rating.replace('_', ' ')}`,
+      )
+      .join('; ')
   }
 
   await render()
 }
 
-/** Exported for the settings screen to reach later; unused for now. */
 export type { Template, Settings }

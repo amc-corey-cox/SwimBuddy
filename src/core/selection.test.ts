@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { estimateMinutes, selectTemplate, type SelectionContext } from './selection'
+import {
+  estimateMinutes,
+  selectForPractice,
+  selectTemplate,
+  type SelectionContext,
+} from './selection'
 import type { Session, Swimmer, Template } from './types'
 
 const META = { created_at: 0, updated_at: 0, deleted: false }
@@ -277,5 +282,159 @@ describe('the reasons given', () => {
     const chosen = selectTemplate(context({ templates: [template('a', { tags: ['im'] })] }))
 
     expect(chosen?.reasons).toContain('New this week: im')
+  })
+})
+
+describe('selecting for a practice', () => {
+  it('offers one arrangement to everybody rather than one each', () => {
+    const selection = selectForPractice({
+      swimmers: [
+        { swimmer: swimmer({ id: 'a' }), recentSessions: [] },
+        { swimmer: swimmer({ id: 'b', base_pace_by_stroke: { free: 90 } }), recentSessions: [] },
+      ],
+      templates: [template('one'), template('two')],
+      requestedMinutes: 45,
+      now: NOW,
+    })
+
+    expect(selection).toBeDefined()
+    expect(selection?.reasons[0]).toBe('Chosen to suit all 2 swimmers.')
+  })
+
+  it('refuses a template any one swimmer may not be given', () => {
+    // One set of 2000 cannot be trimmed under the youth cap, because the resolver
+    // will not go below a single set. So it is eligible for the adult and not for
+    // the youth swimmer, and a practice containing both cannot be given it.
+    const long = template('long', { raw_text: 'main:\n  2000 free @ base+15' })
+    const short = template('short', { raw_text: 'main:\n  4x100 free @ base+15' })
+
+    const adultOnly = selectForPractice({
+      swimmers: [{ swimmer: swimmer({ id: 'a' }), recentSessions: [] }],
+      templates: [long, short],
+      requestedMinutes: 75,
+      now: NOW,
+    })
+    expect(adultOnly?.template.id).toBe('long')
+
+    const withYouth = selectForPractice({
+      swimmers: [
+        { swimmer: swimmer({ id: 'a' }), recentSessions: [] },
+        { swimmer: swimmer({ id: 'b', is_youth: true }), recentSessions: [] },
+      ],
+      templates: [long, short],
+      requestedMinutes: 75,
+      now: NOW,
+    })
+    expect(withYouth?.template.id).toBe('short')
+  })
+
+  it('is steered by the swimmer the arrangement suits worst', () => {
+    // One hard session yesterday for one swimmer takes the hard template off the
+    // table for the whole practice.
+    const hard = template('hard', { intensity: 'hard' })
+    const easy = template('easy', { intensity: 'moderate' })
+
+    const yesterday: Session = {
+      ...META,
+      id: 'session-1',
+      swimmer_id: 'b',
+      template_id: 'hard',
+      date: NOW - DAY,
+      resolved_sets: [],
+      total_distance: 2000,
+      effort_rating: 'about_right',
+      completed: true,
+      notes: '',
+    }
+
+    const selection = selectForPractice({
+      swimmers: [
+        { swimmer: swimmer({ id: 'a' }), recentSessions: [] },
+        { swimmer: swimmer({ id: 'b' }), recentSessions: [yesterday] },
+      ],
+      templates: [hard, easy],
+      requestedMinutes: 45,
+      now: NOW,
+    })
+
+    expect(selection?.template.id).toBe('easy')
+  })
+
+  it('names the swimmer whose history set the choice', () => {
+    const yesterday: Session = {
+      ...META,
+      id: 'session-1',
+      swimmer_id: 'b',
+      template_id: 'endurance',
+      date: NOW - DAY,
+      resolved_sets: [],
+      total_distance: 2000,
+      effort_rating: 'about_right',
+      completed: true,
+      notes: '',
+    }
+
+    const selection = selectForPractice({
+      swimmers: [
+        { swimmer: swimmer({ id: 'a', name: 'Avery' }), recentSessions: [] },
+        { swimmer: swimmer({ id: 'b', name: 'Rowan' }), recentSessions: [yesterday] },
+      ],
+      templates: [template('endurance', { tags: ['endurance'] }), template('sprint')],
+      requestedMinutes: 45,
+      now: NOW,
+    })
+
+    expect(selection?.reasons.some((reason) => reason.startsWith('Rowan: '))).toBe(true)
+  })
+
+  it('reports the time the slowest swimmer will take', () => {
+    const selection = selectForPractice({
+      swimmers: [
+        { swimmer: swimmer({ id: 'a', base_pace_by_stroke: { free: 90 } }), recentSessions: [] },
+        { swimmer: swimmer({ id: 'b', base_pace_by_stroke: { free: 150 } }), recentSessions: [] },
+      ],
+      templates: [template('one')],
+      requestedMinutes: 45,
+      now: NOW,
+    })
+
+    const slowest = estimateMinutes(1000, swimmer({ base_pace_by_stroke: { free: 150 } }))
+    expect(selection?.estimated_minutes).toBeGreaterThanOrEqual(slowest - 1)
+  })
+
+  it('offers nothing to a practice with nobody in it', () => {
+    expect(
+      selectForPractice({
+        swimmers: [],
+        templates: [template('one')],
+        requestedMinutes: 45,
+        now: NOW,
+      }),
+    ).toBeUndefined()
+  })
+
+  it('offers nothing when no arrangement clears everybody', () => {
+    const selection = selectForPractice({
+      swimmers: [
+        { swimmer: swimmer({ id: 'a' }), recentSessions: [], weeklyDistanceBudget: 0 },
+        { swimmer: swimmer({ id: 'b' }), recentSessions: [] },
+      ],
+      templates: [template('one')],
+      requestedMinutes: 45,
+      now: NOW,
+    })
+
+    expect(selection).toBeUndefined()
+  })
+
+  it('says so plainly when the practice is one person', () => {
+    const selection = selectForPractice({
+      swimmers: [{ swimmer: swimmer({ id: 'a' }), recentSessions: [] }],
+      templates: [template('one')],
+      requestedMinutes: 45,
+      now: NOW,
+    })
+
+    expect(selection?.reasons[0]).toBe('One swimmer in this practice.')
   })
 })
