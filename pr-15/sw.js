@@ -1,5 +1,5 @@
 /* Generated at build time — see scripts/service-worker-plugin.ts. */
-const CACHE = 'swim-buddy-mudl9kid'
+const CACHE = 'swim-buddy-mudldlk2'
 const PRECACHE = [
   "/SwimBuddy/pr-15/assets/index-Cy3vg4rF.js",
   "/SwimBuddy/pr-15/assets/app-ByqTPptI.js",
