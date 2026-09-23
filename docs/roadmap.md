@@ -15,7 +15,7 @@ Where the project is going and in what order. The spec for each step lives in
 
 ## Status
 
-Steps 1 to 3 are merged. Steps 4, 5 and 6 are in review, stacked in that order.
+Steps 1 to 3 are merged. Steps 4, 5, 6 and 7 are in review, stacked in that order.
 
 The set model was reworked during step 3 and the parser now targets it: extent is a
 distance or a duration, a set is repetitions over one or more parts, and activities,
@@ -27,10 +27,10 @@ The model itself is now generated from `schema/swimbuddy.yaml`, a LinkML schema,
 than hand-written TypeScript. That also produces a JSON Schema, which is what step 8's
 import path should validate against rather than trusting the file it is handed.
 
-The app is usable end to end: pick a swimmer, pick a length, swim the workout, say how
-it went. Template selection came forward from step 7 because pre-swim cannot generate
-without it; the `load_factor` half of the adaptation rules is still to come, so a rating
-is recorded but does not yet change the next session.
+The app is usable end to end and the loop closes: pick a swimmer, pick a length, swim the
+workout, say how it went, and the next session changes accordingly. What is left before
+this is a finished v1 is History, Settings and the test set flow — steps 8 and 9 — which
+between them are the only way to change a pool unit or record a real base pace.
 
 The resolver landed with the youth safety caps, two of whose numbers the spec named but
 never defined. They are written down now and want the author's sign-off — see Safety in

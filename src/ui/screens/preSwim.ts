@@ -22,6 +22,7 @@ export function preSwimScreen(
   swimmer: Swimmer,
   minutes: number,
   selection: Selection | undefined,
+  adaptationReasons: readonly string[],
   handlers: PreSwimHandlers,
 ): HTMLElement {
   const lengths = SESSION_LENGTHS.map((option) =>
@@ -49,8 +50,8 @@ export function preSwimScreen(
           el('h2', { 'data-testid': 'chosen-template' }, [selection.template.name]),
           el(
             'ul',
-            { class: 'reasons' },
-            selection.reasons.map((reason) => el('li', {}, [reason])),
+            { class: 'reasons', 'data-testid': 'reasons' },
+            [...selection.reasons, ...adaptationReasons].map((reason) => el('li', {}, [reason])),
           ),
           button('Start', handlers.onStart, { class: 'primary', 'data-testid': 'start' }),
         ]
