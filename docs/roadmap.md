@@ -10,9 +10,9 @@ Where the project is going and in what order. The spec for each step lives in
 5. Resolver: template + swimmer → concrete workout.
 6. Workout view screen (+ wake lock, + service worker offline).
 7. Post-swim rating + adaptation rules + tests.
-8. Roster: add, name and remove swimmers, and choose adult or youth.
+8. Roster: add, name and remove swimmers, and choose adult or youth, at the pool.
 9. Practice: one arrangement resolved per swimmer, held in storage rather than memory.
-10. Coach view: the current set across a practice, recording per swimmer as it happens.
+10. The multi-swimmer card: every swimmer's numbers for the current set, on one screen.
 11. Per-set feedback — capture and storage now, adaptation rules later.
 12. History + JSON export/import.
 13. Test set flow.
@@ -32,7 +32,7 @@ path in step 12 should validate against rather than trusting the file it is hand
 
 Steps 8 to 11 were added after the first real look at the deployed app, and they widen
 what this is for: not one family of three taking turns, but a small roster — a family, a
-masters lane, a squad — swimming together with someone watching. The spec's Users section
+masters lane, a squad — swimming together and sharing one phone. The spec's Users section
 is the change; everything here follows from it.
 
 They are ordered by what depends on what rather than by size. The roster comes first
@@ -40,9 +40,9 @@ because a team cannot exist without it and because the swimmers are still called
 and Son, which is the most embarrassing thing about the deployed app. The Practice record
 comes next and is the real structural change: a workout in progress moves out of memory
 and into storage, which fixes the existing bug where leaving the screen loses the swim,
-and which the coach view then needs — a coach holding the only copy of four people's
-practice cannot lose it to a screen lock. The coach view is built on top of that, and is
-mostly presentation once the record exists. Step 11 stores the per-set signal without
+and which step 10 then needs — the phone holding four people's practice is the only copy
+of it. The multi-swimmer card is built on top of that and is mostly presentation once the
+record exists. Step 11 stores the per-set signal without
 acting on it, so the adaptation rules get written against real history rather than
 invented thresholds.
 
