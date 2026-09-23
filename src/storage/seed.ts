@@ -1,4 +1,4 @@
-import type { Swimmer, Term, Timestamp } from '../core/types'
+import type { Swimmer, Term } from '../core/types'
 import { ACTIVITIES } from '../core/activities'
 import { EFFORTS, EQUIPMENT, PATTERNS, STRUCTURES } from '../core/modifiers'
 import { SHIPPED_TEMPLATES } from '../core/templates'
@@ -17,15 +17,14 @@ import type { CatalogueCollection, RecordInput, SwimBuddyStore } from './store'
  */
 export interface SeedSwimmer {
   readonly name: string
-  readonly age_at_seed: number
   readonly provisional_base_pace: number
   readonly is_youth: boolean
 }
 
 export const SEED_SWIMMERS: readonly SeedSwimmer[] = [
-  { name: 'Me', age_at_seed: 47, provisional_base_pace: 120, is_youth: false },
-  { name: 'Wife', age_at_seed: 44, provisional_base_pace: 130, is_youth: false },
-  { name: 'Son', age_at_seed: 11, provisional_base_pace: 135, is_youth: true },
+  { name: 'Me', provisional_base_pace: 120, is_youth: false },
+  { name: 'Wife', provisional_base_pace: 130, is_youth: false },
+  { name: 'Son', provisional_base_pace: 135, is_youth: true },
 ]
 
 export interface SeedResult {
@@ -38,11 +37,6 @@ export interface SeedResult {
   readonly templates: number
 }
 
-export interface SeedOptions {
-  /** Birth years are derived from this, so seeding stays deterministic. */
-  readonly referenceDate?: Timestamp
-}
-
 /**
  * Populates an empty store with the default household and settings.
  *
@@ -50,10 +44,7 @@ export interface SeedOptions {
  * exist at all, tombstoned ones included. Someone who deletes every swimmer has
  * made a decision, and re-seeding would undo it behind their back.
  */
-export async function seedIfEmpty(
-  store: SwimBuddyStore,
-  options: SeedOptions = {},
-): Promise<SeedResult> {
+export async function seedIfEmpty(store: SwimBuddyStore): Promise<SeedResult> {
   // The decision to seed counts tombstones; the list handed back to the caller
   // does not. Callers render this, and every other read hides deleted rows.
   // Catalogues seed independently of the household. They are reference data, and
@@ -72,14 +63,10 @@ export async function seedIfEmpty(
     }
   }
 
-  const referenceDate = options.referenceDate ?? Date.now()
-  const year = new Date(referenceDate).getUTCFullYear()
-
   const created: Swimmer[] = []
   for (const seed of SEED_SWIMMERS) {
     const input: RecordInput<Swimmer> = {
       name: seed.name,
-      birth_year: year - seed.age_at_seed,
       base_pace_by_stroke: { free: seed.provisional_base_pace },
       load_factor: 1.0,
       is_youth: seed.is_youth,

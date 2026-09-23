@@ -118,7 +118,6 @@ describe('the catalogue collections', () => {
     // activity has to reach a store someone is already using.
     await store.swimmers.create({
       name: 'Existing',
-      birth_year: 1990,
       base_pace_by_stroke: { free: 120 },
       load_factor: 1,
       is_youth: false,
