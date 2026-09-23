@@ -18,7 +18,7 @@ export type {
   TestSetCollection,
 } from './store'
 export { seedIfEmpty, SEED_SWIMMERS } from './seed'
-export type { SeedOptions, SeedResult, SeedSwimmer } from './seed'
+export type { SeedResult, SeedSwimmer } from './seed'
 export {
   DATABASE_NAME,
   DATABASE_VERSION,
