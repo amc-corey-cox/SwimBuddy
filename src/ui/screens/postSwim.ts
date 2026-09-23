@@ -14,22 +14,38 @@ export interface PostSwimAnswers {
  * run off. Everything else has a sensible default so that tapping once and
  * putting the phone down records something true.
  */
+export interface PostSwimDefaults {
+  /**
+   * Where the completed toggle starts.
+   *
+   * A swimmer who flagged a set as unfinished during the practice has already
+   * said they cut it short, so the screen opens on that answer rather than
+   * asking again and letting the two records disagree.
+   */
+  readonly completed?: boolean
+}
+
 export function postSwimScreen(
   swimmer: Swimmer,
   onDone: (answers: PostSwimAnswers) => void,
+  defaults: PostSwimDefaults = {},
 ): HTMLElement {
-  let completed = true
+  let completed = defaults.completed ?? true
   let fun: FunRating | undefined
 
   const completedToggle = button(
-    'Finished the main set',
+    completed ? 'Finished the main set' : 'Cut it short',
     () => {
       completed = !completed
       completedToggle.textContent = completed ? 'Finished the main set' : 'Cut it short'
       completedToggle.className = completed ? 'chip chip-on' : 'chip'
       completedToggle.setAttribute('aria-pressed', completed ? 'true' : 'false')
     },
-    { class: 'chip chip-on', 'data-testid': 'completed', 'aria-pressed': 'true' },
+    {
+      class: completed ? 'chip chip-on' : 'chip',
+      'data-testid': 'completed',
+      'aria-pressed': completed ? 'true' : 'false',
+    },
   )
 
   const funRow = swimmer.is_youth

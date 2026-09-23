@@ -8,8 +8,16 @@ import { postSwimScreen, type PostSwimAnswers } from './screens/postSwim'
 import { keepScreenAwake, type WakeLock } from './wakeLock'
 import { adapt, type Adaptation } from '../core/adaptation'
 import { resolvePractice } from '../core/practice'
+import { resolveTemplate, setDistance } from '../core/resolver'
 import { selectForPractice, type PracticeSelection } from '../core/selection'
-import type { EffortRating, Settings, Swimmer, Template, Uuid } from '../core/types'
+import type {
+  EffortRating,
+  ResolvedWorkout,
+  Settings,
+  Swimmer,
+  Template,
+  Uuid,
+} from '../core/types'
 import type { SwimBuddyStore } from '../storage/store'
 
 /**
@@ -27,7 +35,8 @@ import type { SwimBuddyStore } from '../storage/store'
 
 interface Practice {
   readonly template: Template
-  readonly members: readonly Participant[]
+  /** Mutable: somebody arrives late, somebody gets out early. */
+  readonly members: Participant[]
   /**
    * Where each swimmer actually is.
    *
@@ -38,6 +47,15 @@ interface Practice {
   readonly positions: Map<Uuid, number>
   /** Set feedback, keyed by swimmer then by the set's position in their workout. */
   readonly flags: Map<Uuid, Map<string, EffortRating>>
+  /** Sets a swimmer did not finish, keyed the same way. */
+  readonly unfinished: Map<Uuid, Set<string>>
+  /**
+   * Swimmers who got out, and how many sets they had swum when they did.
+   *
+   * They leave the cards but not the practice: what they swam still counts, so
+   * they are still rated at the end like everybody else.
+   */
+  readonly departed: Map<Uuid, number>
 }
 
 type Screen =
@@ -45,7 +63,13 @@ type Screen =
   | { readonly name: 'roster' }
   | { readonly name: 'pre-swim'; readonly swimmers: readonly Swimmer[]; readonly minutes: number }
   | { readonly name: 'workout'; readonly practice: Practice; readonly index: number }
-  | { readonly name: 'post-swim'; readonly practice: Practice; readonly rated: number }
+  | {
+      readonly name: 'post-swim'
+      readonly practice: Practice
+      readonly rated: number
+      /** How many sets each swimmer actually swam, which is what gets recorded. */
+      readonly swam: ReadonlyMap<Uuid, number>
+    }
 
 export interface AppOptions {
   readonly store: SwimBuddyStore
@@ -130,6 +154,33 @@ export async function startApp(options: AppOptions): Promise<void> {
     })
 
     return { selection, adaptations }
+  }
+
+  /**
+   * How many sets each swimmer swam.
+   *
+   * `stoppedAt` is the practice position everybody was abandoned on, or null when
+   * the practice ran to the end. A swimmer is credited with the sets they got
+   * past: reaching the last card means the last set was swum, whereas stopping on
+   * a set means it was not. Somebody who got out early is frozen where they left.
+   */
+  function swamByEveryone(practice: Practice, stoppedAt: number | null): ReadonlyMap<Uuid, number> {
+    const swam = new Map<Uuid, number>()
+
+    for (const member of practice.members) {
+      const id = member.swimmer.id
+      const sets = member.workout.sections.reduce(
+        (count, section) => count + section.sets.length,
+        0,
+      )
+      const departed = practice.departed.get(id)
+      const reached =
+        departed ?? (stoppedAt === null ? sets : Math.min(practice.positions.get(id) ?? 0, sets))
+
+      swam.set(id, Math.max(0, Math.min(reached, sets)))
+    }
+
+    return swam
   }
 
   function go(next: Screen): void {
@@ -259,6 +310,8 @@ export async function startApp(options: AppOptions): Promise<void> {
                 ).map(({ swimmer, workout }) => ({ swimmer, workout })),
                 positions: new Map(chosen.map((swimmer) => [swimmer.id, 0])),
                 flags: new Map(),
+                unfinished: new Map(),
+                departed: new Map(),
               },
               index: 0,
             })
@@ -282,40 +335,98 @@ export async function startApp(options: AppOptions): Promise<void> {
         if (rating !== undefined) flagsHere.set(swimmerId, rating)
       }
 
+      const unfinishedHere = new Set<Uuid>()
+      for (const [swimmerId, positions] of practice.unfinished) {
+        if (positions.has(String(positionOf(swimmerId)))) unfinishedHere.add(swimmerId)
+      }
+
+      const swimming = practice.members.filter(
+        (member) => !practice.departed.has(member.swimmer.id),
+      )
+
       mount.append(
-        workoutScreen(practice.members, settings, index, practice.positions, flagsHere, {
-          onStep: (next) => {
-            // The practice moves and everybody moves with it, keeping whatever
-            // drift they had: a swimmer a set behind is still a set behind.
-            for (const member of practice.members) {
-              practice.positions.set(
-                member.swimmer.id,
-                positionOf(member.swimmer.id) + next - index,
-              )
-            }
-            go({ name: 'workout', practice, index: next })
+        workoutScreen(
+          {
+            participants: swimming,
+            settings,
+            index,
+            positions: practice.positions,
+            flags: flagsHere,
+            unfinished: unfinishedHere,
+            available: swimmers.filter(
+              (swimmer) => !practice.members.some((member) => member.swimmer.id === swimmer.id),
+            ),
           },
-          onStepSwimmer: (swimmer, to) => {
-            practice.positions.set(swimmer.id, to)
-            void render()
+          {
+            onStep: (next) => {
+              // The practice moves and everybody moves with it, keeping whatever
+              // drift they had: a swimmer a set behind is still a set behind.
+              for (const member of swimming) {
+                practice.positions.set(
+                  member.swimmer.id,
+                  positionOf(member.swimmer.id) + next - index,
+                )
+              }
+              go({ name: 'workout', practice, index: next })
+            },
+            onStepSwimmer: (swimmer, to) => {
+              practice.positions.set(swimmer.id, to)
+              void render()
+            },
+            onFinish: () => {
+              // Reaching the last card means the last set was swum, so everybody
+              // is credited with the whole of their own workout.
+              go({ name: 'post-swim', practice, rated: 0, swam: swamByEveryone(practice, null) })
+            },
+            onEnd: () => {
+              // Stopping here credits the sets that were actually finished. The
+              // set on screen is the one nobody got to the end of.
+              go({ name: 'post-swim', practice, rated: 0, swam: swamByEveryone(practice, index) })
+            },
+            onFlag: (swimmer, rating) => {
+              const byPosition = practice.flags.get(swimmer.id) ?? new Map<string, EffortRating>()
+              const at = String(positionOf(swimmer.id))
+              if (rating === undefined) byPosition.delete(at)
+              else byPosition.set(at, rating)
+              practice.flags.set(swimmer.id, byPosition)
+              void render()
+            },
+            onUnfinished: (swimmer, unfinished) => {
+              const positions = practice.unfinished.get(swimmer.id) ?? new Set<string>()
+              const at = String(positionOf(swimmer.id))
+              if (unfinished) positions.add(at)
+              else positions.delete(at)
+              practice.unfinished.set(swimmer.id, positions)
+              void render()
+            },
+            onLeave: (swimmer) => {
+              // They stop appearing on the cards and keep their place in the
+              // rating queue: what they swam counts.
+              practice.departed.set(swimmer.id, positionOf(swimmer.id))
+              void render()
+            },
+            onJoin: (swimmer) => {
+              // Resolved alone rather than rebalancing the practice: everybody
+              // else is partway through sets whose rep counts must not move
+              // under them. The newcomer starts where the practice already is.
+              const adaptation = adapt(swimmer, [], now())
+              practice.members.push({
+                swimmer,
+                workout: resolveTemplate(practice.template, swimmer, {
+                  loadFactor: adaptation.load_factor,
+                  sendOffBonusSeconds: adaptation.send_off_bonus_seconds,
+                }),
+              })
+              practice.positions.set(swimmer.id, index)
+              void render()
+            },
           },
-          onFinish: () => {
-            go({ name: 'post-swim', practice, rated: 0 })
-          },
-          onFlag: (swimmer, rating) => {
-            const byPosition = practice.flags.get(swimmer.id) ?? new Map<string, EffortRating>()
-            const at = String(positionOf(swimmer.id))
-            if (rating === undefined) byPosition.delete(at)
-            else byPosition.set(at, rating)
-            practice.flags.set(swimmer.id, byPosition)
-            void render()
-          },
-        }),
+        ),
       )
       return
     }
 
-    const { practice, rated } = current
+    const { practice, rated, swam } = current
     const member = practice.members[rated]
 
     // Everyone has been rated, so the practice is over. The selection goes with
@@ -327,22 +438,62 @@ export async function startApp(options: AppOptions): Promise<void> {
       return
     }
 
+    const swum = swumBy(member, swam.get(member.swimmer.id))
+
     mount.append(
       el('p', { class: 'muted', 'data-testid': 'swum' }, [
-        distance(member.workout.total_distance, settings.pool_unit),
+        distance(swum.total_distance, settings.pool_unit),
       ]),
-      postSwimScreen(member.swimmer, (answers) => {
-        void finish(practice, rated, answers).then(() => {
-          go({ name: 'post-swim', practice, rated: rated + 1 })
-        })
-      }),
+      postSwimScreen(
+        member.swimmer,
+        (answers) => {
+          void finish(practice, rated, answers, swum).then(() => {
+            go({ name: 'post-swim', practice, rated: rated + 1, swam })
+          })
+        },
+        // Any set they did not finish means they cut it short, which is the
+        // answer the adaptation rules read. Presenting it already chosen saves a
+        // tap and stops the two records contradicting each other.
+        { completed: (practice.unfinished.get(member.swimmer.id)?.size ?? 0) === 0 },
+      ),
     )
+  }
+
+  /**
+   * The part of a workout a swimmer actually swam.
+   *
+   * A practice that ended early, or that somebody got out of, should record the
+   * sets that happened rather than the ones that were planned — otherwise the
+   * history says they swam 2000 on a day they swam 800, and every rule that
+   * reads volume is wrong from then on.
+   */
+  function swumBy(
+    member: Participant,
+    sets: number | undefined,
+  ): { sections: ResolvedWorkout['sections']; total_distance: number } {
+    const all = member.workout.sections.reduce((count, s) => count + s.sets.length, 0)
+    if (sets === undefined || sets >= all) {
+      return { sections: member.workout.sections, total_distance: member.workout.total_distance }
+    }
+
+    const sections: ResolvedWorkout['sections'][number][] = []
+    let remaining = sets
+
+    for (const section of member.workout.sections) {
+      if (remaining <= 0) break
+      const taken = section.sets.slice(0, remaining)
+      remaining -= taken.length
+      if (taken.length > 0) sections.push({ ...section, sets: taken })
+    }
+
+    return { sections, total_distance: distanceOf(sections, member.swimmer) }
   }
 
   async function finish(
     practice: Practice,
     index: number,
     answers: PostSwimAnswers,
+    swum: { sections: ResolvedWorkout['sections']; total_distance: number },
   ): Promise<void> {
     const member = practice.members[index]
     if (member === undefined) return
@@ -353,8 +504,8 @@ export async function startApp(options: AppOptions): Promise<void> {
       swimmer_id: swimmer.id,
       template_id: workout.template_id,
       date: now(),
-      resolved_sets: workout.sections,
-      total_distance: workout.total_distance,
+      resolved_sets: swum.sections,
+      total_distance: swum.total_distance,
       effort_rating: answers.effort,
       completed: answers.completed,
       ...(answers.fun === undefined ? {} : { fun_rating: answers.fun }),
@@ -398,6 +549,15 @@ export async function startApp(options: AppOptions): Promise<void> {
   }
 
   await render()
+}
+
+/** What a run of sections is worth, once some of them have been cut off. */
+function distanceOf(sections: ResolvedWorkout['sections'], swimmer: Swimmer): number {
+  return sections.reduce(
+    (sum, section) =>
+      sum + section.sets.reduce((inner, set) => inner + setDistance(set, swimmer), 0),
+    0,
+  )
 }
 
 export type { Template, Settings }

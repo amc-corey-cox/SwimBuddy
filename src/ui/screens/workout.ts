@@ -13,14 +13,37 @@ export interface Participant {
   readonly workout: ResolvedWorkout
 }
 
+/** Everything the screen draws. An options object, because it is a lot of state. */
+export interface WorkoutView {
+  readonly participants: readonly Participant[]
+  readonly settings: Settings
+  /** The set being called out. */
+  readonly index: number
+  /** Where each swimmer actually is, which is not always where the practice is. */
+  readonly positions: ReadonlyMap<string, number>
+  readonly flags: ReadonlyMap<string, EffortRating>
+  /** Swimmers who did not finish the set they are on. */
+  readonly unfinished: ReadonlySet<string>
+  /** Roster members not in this practice, who can still join it. */
+  readonly available: readonly Swimmer[]
+}
+
 export interface WorkoutHandlers {
   /** Moves the whole practice, and everybody in it, to a position. */
   onStep: (index: number) => void
   /** Moves one swimmer without touching anybody else. */
   onStepSwimmer: (swimmer: Swimmer, index: number) => void
   onFinish: () => void
+  /** Stops here, recording what everybody actually swam. */
+  onEnd: () => void
   /** Records that this set was too hard or too easy for one swimmer. */
   onFlag: (swimmer: Swimmer, rating: EffortRating | undefined) => void
+  /** Records that one swimmer did not finish the set they are on. */
+  onUnfinished: (swimmer: Swimmer, unfinished: boolean) => void
+  /** Somebody got out. What they swam so far still counts. */
+  onLeave: (swimmer: Swimmer) => void
+  /** Somebody turned up late and joins where the practice already is. */
+  onJoin: (swimmer: Swimmer) => void
 }
 
 /** Where a set sits in a workout. Positions line up across swimmers. */
@@ -40,17 +63,9 @@ interface Position {
  *
  * With more than one swimmer the card grows a row each, because a send-off
  * differs per person and whoever is calling the set needs all of them at once.
- * Advancing moves the whole practice: the number being called out is one number.
  */
-export function workoutScreen(
-  participants: readonly Participant[],
-  settings: Settings,
-  index: number,
-  /** Where each swimmer actually is, which is not always where the practice is. */
-  swimmerPositions: ReadonlyMap<string, number>,
-  flags: ReadonlyMap<string, EffortRating>,
-  handlers: WorkoutHandlers,
-): HTMLElement {
+export function workoutScreen(view: WorkoutView, handlers: WorkoutHandlers): HTMLElement {
+  const { participants, settings, index } = view
   const positions = positionsFor(participants)
   const current = positions[index]
 
@@ -70,17 +85,8 @@ export function workoutScreen(
     ]),
     ...(solo
       ? soloCard(participants, current, settings)
-      : participants.map((participant) =>
-          swimmerCard(
-            participant,
-            positions,
-            swimmerPositions.get(participant.swimmer.id) ?? index,
-            index,
-            settings,
-            flags,
-            handlers,
-          ),
-        )),
+      : participants.map((participant) => swimmerCard(participant, positions, view, handlers))),
+    ...joinRow(view, handlers),
     el('div', { class: 'row' }, [
       button(
         '‹ Prev',
@@ -89,6 +95,7 @@ export function workoutScreen(
         },
         { class: 'link', 'data-testid': 'prev', ...(index === 0 ? { disabled: 'true' } : {}) },
       ),
+      endControl(handlers),
       last
         ? button('Finish', handlers.onFinish, { class: 'primary', 'data-testid': 'finish' })
         : button(
@@ -103,12 +110,63 @@ export function workoutScreen(
 }
 
 /**
+ * Stopping before the end.
+ *
+ * Pool time runs out, a child has had enough, somebody has to be somewhere. The
+ * swim still happened, so this records what everybody actually swam rather than
+ * throwing the session away — which is what leaving the screen used to do.
+ *
+ * Two taps, for the same reason the reset control takes two: the second tap is
+ * the confirmation, and it reads at arm's length on a wet screen.
+ */
+function endControl(handlers: WorkoutHandlers): HTMLButtonElement {
+  let armed = false
+
+  const control = button(
+    'End',
+    () => {
+      if (!armed) {
+        armed = true
+        control.textContent = 'End it?'
+        control.classList.add('armed')
+        return
+      }
+      handlers.onEnd()
+    },
+    { class: 'link end', 'data-testid': 'end-practice' },
+  )
+
+  return control
+}
+
+/** Somebody who turned up late, joining where the practice already is. */
+function joinRow(view: WorkoutView, handlers: WorkoutHandlers): HTMLElement[] {
+  if (view.available.length === 0) return []
+
+  return [
+    el(
+      'div',
+      { class: 'chips join', 'data-testid': 'join-row' },
+      view.available.map((swimmer) =>
+        button(
+          `+ ${swimmer.name}`,
+          () => {
+            handlers.onJoin(swimmer)
+          },
+          { class: 'chip', 'data-testid': `join-${swimmer.id}` },
+        ),
+      ),
+    ),
+  ]
+}
+
+/**
  * The positions a practice steps through.
  *
  * Taken from whichever swimmer has the most sets, because the youth distance cap
  * can trim somebody's workout shorter than the rest. The whiteboard still has the
  * whole thing on it; a swimmer whose version stopped earlier is simply done, and
- * their row says so rather than inventing a set for them.
+ * their card says so rather than inventing a set for them.
  */
 function positionsFor(participants: readonly Participant[]): readonly Position[] {
   let longest: readonly Position[] = []
@@ -138,38 +196,34 @@ function soloCard(
   const set = setAt(participant.workout, position)
   if (set === undefined) return []
 
-  return [setCard(set, settings)]
-}
-
-function setCard(set: ResolvedSet, settings: Settings): HTMLElement {
-  return el('article', { class: 'card', 'data-testid': 'set-card' }, [
-    ...setLines(set, 'headline'),
-    el('p', { class: 'muted unit' }, [settings.pool_unit]),
-  ])
+  return [
+    el('article', { class: 'card', 'data-testid': 'set-card' }, [
+      ...setLines(set, 'headline'),
+      el('p', { class: 'muted unit' }, [settings.pool_unit]),
+    ]),
+  ]
 }
 
 /**
- * One swimmer's version of the current set, with the two taps that record how it
+ * One swimmer's version of the set they are on, with the taps that record how it
  * went for them.
  *
- * Flagging is never required. A practice where nobody taps anything still ends
- * with a workout recorded for everyone — the flag is a strong signal precisely
- * because it is only used when something was actually wrong.
+ * None of it is required. A practice where nobody taps anything still ends with a
+ * workout recorded for everyone — a flag is a strong signal precisely because it
+ * is only used when something was actually worth saying.
  */
 function swimmerCard(
   participant: Participant,
   positions: readonly Position[],
-  own: number,
-  practice: number,
-  settings: Settings,
-  flags: ReadonlyMap<string, EffortRating>,
+  view: WorkoutView,
   handlers: WorkoutHandlers,
 ): HTMLElement {
   const { swimmer } = participant
+  const own = view.positions.get(swimmer.id) ?? view.index
   const position = positions[own]
   const set = position === undefined ? undefined : setAt(participant.workout, position)
-  const flag = flags.get(swimmer.id)
-  const behind = own - practice
+  const flag = view.flags.get(swimmer.id)
+  const behind = own - view.index
 
   const header = el('div', { class: 'swimmer-head' }, [
     el('p', { class: 'swimmer-name', 'data-testid': `set-swimmer-${swimmer.id}` }, [swimmer.name]),
@@ -184,10 +238,19 @@ function swimmerCard(
     nudge(swimmer, own + 1, '›', own >= positions.length, handlers),
   ])
 
+  const leave = button(
+    'Got out',
+    () => {
+      handlers.onLeave(swimmer)
+    },
+    { class: 'link danger small', 'data-testid': `leave-${swimmer.id}` },
+  )
+
   if (set === undefined) {
     return el('article', { class: 'card card-done', 'data-testid': `set-card-${swimmer.id}` }, [
       header,
       el('p', { class: 'muted' }, ['Done — past the end of their workout.']),
+      leave,
     ])
   }
 
@@ -197,8 +260,12 @@ function swimmerCard(
     el('div', { class: 'chips' }, [
       flagChip(swimmer, 'too_easy', 'Too easy', flag, handlers),
       flagChip(swimmer, 'too_hard', 'Too hard', flag, handlers),
+      unfinishedChip(swimmer, view.unfinished.has(swimmer.id), handlers),
     ]),
-    el('p', { class: 'muted unit' }, [settings.pool_unit]),
+    el('div', { class: 'card-foot' }, [
+      el('p', { class: 'muted unit' }, [view.settings.pool_unit]),
+      leave,
+    ]),
   ])
 }
 
@@ -247,6 +314,34 @@ function flagChip(
     {
       class: on ? 'chip chip-on' : 'chip',
       'data-testid': `flag-${rating}-${swimmer.id}`,
+      'aria-pressed': on ? 'true' : 'false',
+    },
+  )
+}
+
+/**
+ * Did not finish this set.
+ *
+ * Kept separate from "too hard" rather than folded into it, because they are
+ * different facts and only one of them is about the set. A swimmer stops for a
+ * cramp, for the clock, or because somebody has to leave; a set being too hard is
+ * a judgement about the set. Where they do coincide the app joins them up: any
+ * unfinished set means the post-swim screen opens on "cut it short" already
+ * chosen, which is the answer the adaptation rules actually read.
+ */
+function unfinishedChip(
+  swimmer: Swimmer,
+  on: boolean,
+  handlers: WorkoutHandlers,
+): HTMLButtonElement {
+  return button(
+    'Did not finish',
+    () => {
+      handlers.onUnfinished(swimmer, !on)
+    },
+    {
+      class: on ? 'chip chip-on' : 'chip',
+      'data-testid': `flag-unfinished-${swimmer.id}`,
       'aria-pressed': on ? 'true' : 'false',
     },
   )
