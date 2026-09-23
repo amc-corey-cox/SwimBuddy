@@ -1035,9 +1035,6 @@
         "base_pace_by_stroke": {
           "$ref": "#/$defs/BasePaceByStroke"
         },
-        "birth_year": {
-          "type": "integer"
-        },
         "created_at": {
           "type": "integer"
         },
@@ -1065,7 +1062,6 @@
       },
       "required": [
         "name",
-        "birth_year",
         "base_pace_by_stroke",
         "load_factor",
         "is_youth",

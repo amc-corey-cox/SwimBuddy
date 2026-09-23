@@ -36,7 +36,6 @@ async function freshStore(migrations?: readonly Migration[]): Promise<SwimBuddyS
 
 const aSwimmer = {
   name: 'Test Swimmer',
-  birth_year: 1985,
   base_pace_by_stroke: { free: 100 },
   load_factor: 1.0,
   is_youth: false,

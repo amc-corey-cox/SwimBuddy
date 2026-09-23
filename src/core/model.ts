@@ -336,7 +336,6 @@ export interface BasePaceByStroke {
 
 export interface Swimmer extends RecordMeta {
     readonly name: string,
-    readonly birth_year: number,
     readonly base_pace_by_stroke: BasePaceByStroke,
     /** Scales rep counts and send-offs. Clamped by the adaptation rules. */
     readonly load_factor: number,
