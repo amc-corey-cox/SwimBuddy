@@ -27,3 +27,4 @@ export {
   selectMigrations,
 } from './schema'
 export type { Migration, MigrationContext } from './schema'
+export { deleteDatabase, openDatabase } from './db'

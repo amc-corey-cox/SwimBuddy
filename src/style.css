@@ -3,6 +3,7 @@
   --fg: #eef4ff;
   --muted: #9bb0cc;
   --accent: #3ea6ff;
+  --danger: #ff6b6b;
   color-scheme: dark;
   font-family:
     system-ui,
@@ -54,6 +55,29 @@ h1 {
 
 .source-footer a {
   color: var(--accent);
+}
+
+/* Deliberately quiet: it erases everything and there is no undo, so it should
+   not look like something to press. The armed state is the opposite. */
+.source-footer .reset {
+  margin-left: 1rem;
+  padding: 0.2rem 0.5rem;
+  background: none;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 0.4rem;
+  color: var(--muted);
+  font: inherit;
+  cursor: pointer;
+}
+
+.source-footer .reset.armed {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.source-footer .reset[disabled] {
+  opacity: 0.6;
+  cursor: default;
 }
 
 .demo {

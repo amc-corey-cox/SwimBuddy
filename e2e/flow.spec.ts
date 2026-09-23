@@ -181,3 +181,38 @@ test('a rating changes the next swim', async ({ page }) => {
 
   await expect(page.getByTestId('reasons')).toContainText('Last swim was too hard')
 })
+
+/**
+ * The reset control is the only way to clear data until Settings exists, and it
+ * is the kind of thing that has to be proved in a browser: deleting an
+ * IndexedDB database that still has an open connection does not fail, it hangs.
+ */
+test('reset erases the store and the app comes back seeded', async ({ page }) => {
+  await page.goto('/')
+  await expect(page.getByTestId('screen-home')).toBeVisible()
+
+  const swimmerCount = await page.locator('[data-testid^="swimmer-"]').count()
+  expect(swimmerCount).toBeGreaterThan(0)
+
+  // One tap arms it; the label is the confirmation.
+  await page.getByTestId('reset').click()
+  await expect(page.getByTestId('reset')).toHaveText('Tap again to erase')
+
+  await page.getByTestId('reset').click()
+
+  // The reload is the assertion that the delete completed: a blocked delete
+  // never resolves, so this would time out rather than come back.
+  await expect(page.getByTestId('screen-home')).toBeVisible()
+  await expect(page.locator('[data-testid^="swimmer-"]')).toHaveCount(swimmerCount)
+})
+
+test('an armed reset disarms itself rather than staying primed', async ({ page }) => {
+  await page.goto('/')
+  await expect(page.getByTestId('screen-home')).toBeVisible()
+
+  await page.getByTestId('reset').click()
+  await expect(page.getByTestId('reset')).toHaveText('Tap again to erase')
+
+  // A stray tap in a pocket should not leave a second stray tap able to wipe it.
+  await expect(page.getByTestId('reset')).toHaveText('Reset data', { timeout: 10_000 })
+})
