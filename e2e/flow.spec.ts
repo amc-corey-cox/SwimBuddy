@@ -22,9 +22,17 @@ async function advanceToFinish(page: Page): Promise<void> {
   await expect(page.getByTestId('finish')).toBeVisible()
 }
 
-async function startSwimming(page: Page): Promise<void> {
+/**
+ * Picking a swimmer now selects them rather than navigating: the roster is not
+ * an attendance list, so who is in is chosen before the practice starts.
+ */
+async function startSwimming(page: Page, swimmers = 1): Promise<void> {
   await page.goto('/SwimBuddy/')
-  await page.getByTestId('screen-home').getByRole('button').first().click()
+  const tiles = page.locator('[data-testid^="swimmer-"]')
+  for (let index = 0; index < swimmers; index += 1) {
+    await tiles.nth(index).click()
+  }
+  await page.getByTestId('start-practice').click()
   await expect(page.getByTestId('screen-pre-swim')).toBeVisible()
   await page.getByTestId('start').click()
   await expect(page.getByTestId('screen-workout')).toBeVisible()
@@ -90,7 +98,8 @@ test('a send-off reads as a clock time', async ({ page }) => {
 
 test('the length buttons change what is offered', async ({ page }) => {
   await page.goto('/SwimBuddy/')
-  await page.getByTestId('screen-home').getByRole('button').first().click()
+  await page.locator('[data-testid^="swimmer-"]').first().click()
+  await page.getByTestId('start-practice').click()
 
   await page.getByTestId('length-30').click()
   await expect(page.getByTestId('length-30')).toHaveAttribute('aria-pressed', 'true')
@@ -100,7 +109,8 @@ test('the length buttons change what is offered', async ({ page }) => {
 test('the youth swimmer is offered something within the cap', async ({ page }) => {
   // The household seeds Me, Wife and Son; the son is the youth profile.
   await page.goto('/SwimBuddy/')
-  await page.getByTestId('screen-home').getByRole('button').nth(2).click()
+  await page.locator('[data-testid^="swimmer-"]').nth(2).click()
+  await page.getByTestId('start-practice').click()
 
   await expect(page.getByTestId('chosen-template')).toBeVisible()
   await page.getByTestId('start').click()
@@ -109,7 +119,8 @@ test('the youth swimmer is offered something within the cap', async ({ page }) =
 
 test('back returns to the swimmer list', async ({ page }) => {
   await page.goto('/SwimBuddy/')
-  await page.getByTestId('screen-home').getByRole('button').first().click()
+  await page.locator('[data-testid^="swimmer-"]').first().click()
+  await page.getByTestId('start-practice').click()
   await page.getByTestId('back').click()
 
   await expect(page.getByTestId('screen-home')).toBeVisible()
@@ -167,7 +178,8 @@ test('it is installable', async ({ page }) => {
 test('a rating changes the next swim', async ({ page }) => {
   // The loop's whole point: saying it was too hard has to reach the next session.
   await page.goto('/SwimBuddy/')
-  await page.getByTestId('screen-home').getByRole('button').first().click()
+  await page.locator('[data-testid^="swimmer-"]').first().click()
+  await page.getByTestId('start-practice').click()
   await expect(page.getByTestId('reasons')).toBeVisible()
   await expect(page.getByTestId('reasons')).not.toContainText('Last swim was too hard')
 
@@ -177,7 +189,134 @@ test('a rating changes the next swim', async ({ page }) => {
   await page.getByTestId('effort-too_hard').click()
 
   await expect(page.getByTestId('screen-home')).toBeVisible()
-  await page.getByTestId('screen-home').getByRole('button').first().click()
+  await page.locator('[data-testid^="swimmer-"]').first().click()
+  await page.getByTestId('start-practice').click()
 
   await expect(page.getByTestId('reasons')).toContainText('Last swim was too hard')
+})
+
+/**
+ * The roster is the screen without which a team cannot exist. It is also the
+ * only place a swimmer's name or safety profile can be changed, so every one of
+ * these is a thing that was impossible before it existed.
+ */
+test('a swimmer can be added, renamed and removed', async ({ page }) => {
+  await page.goto('/SwimBuddy/')
+  await page.getByTestId('open-roster').click()
+  await expect(page.getByTestId('screen-roster')).toBeVisible()
+
+  const before = await page.locator('[data-testid^="roster-row-"]').count()
+
+  await page.getByTestId('roster-new-name').fill('Rowan')
+  await page.getByTestId('roster-new-kind').click()
+  await expect(page.getByTestId('roster-new-kind')).toHaveText('Youth')
+  await page.getByTestId('roster-add').click()
+
+  await expect(page.locator('[data-testid^="roster-row-"]')).toHaveCount(before + 1)
+  // Rows come back in the store's key order, not insertion order, so the new
+  // swimmer is found by name rather than by position.
+  const added = page
+    .locator('[data-testid^="roster-row-"]')
+    .filter({ has: page.locator('input[value="Rowan"]') })
+  await expect(added.locator('[data-testid^="roster-kind-"]')).toHaveText('Youth')
+
+  // The name reaches the tiles, which is the whole complaint about Me/Wife/Son.
+  await page.getByTestId('roster-done').click()
+  await expect(page.getByTestId('screen-home')).toContainText('Rowan')
+
+  await page.getByTestId('open-roster').click()
+  await added.locator('[data-testid^="roster-remove-"]').click()
+  await expect(page.locator('[data-testid^="roster-row-"]')).toHaveCount(before)
+})
+
+test('renaming a swimmer sticks across a reload', async ({ page }) => {
+  await page.goto('/SwimBuddy/')
+  await page.getByTestId('open-roster').click()
+
+  const first = page.locator('[data-testid^="roster-name-"]').first()
+  await first.fill('Quinn')
+  await first.blur()
+
+  await page.reload()
+  await expect(page.getByTestId('screen-home')).toContainText('Quinn')
+})
+
+test('adult or youth is a choice, and it changes what is offered', async ({ page }) => {
+  await page.goto('/SwimBuddy/')
+  await page.getByTestId('open-roster').click()
+
+  // Swimmer ids are random, so rows come back in a different order every run.
+  // Pick the swimmer by what the row says rather than by where it sits.
+  const kind = page.locator('[data-testid^="roster-kind-"]').filter({ hasText: 'Adult' }).first()
+  const id = await kind.getAttribute('data-testid')
+  await kind.click()
+  await expect(page.getByTestId(id ?? '')).toHaveText('Youth')
+
+  await page.reload()
+  await page.getByTestId('open-roster').click()
+  await expect(page.getByTestId(id ?? '')).toHaveText('Youth')
+})
+
+/**
+ * A practice: everybody on one arrangement, each with their own numbers, all
+ * advancing together. This is the thing the app could not do at all before.
+ */
+test('several swimmers share one arrangement with their own numbers', async ({ page }) => {
+  await startSwimming(page, 3)
+
+  // One card per swimmer, all on the same set.
+  await expect(page.locator('[data-testid^="set-card-"]')).toHaveCount(3)
+
+  // Warmups often prescribe no interval, so step on until a set does.
+  for (let guard = 0; guard < 20; guard += 1) {
+    if ((await page.getByTestId('send-off').count()) > 1) break
+    await page.getByTestId('next').click()
+  }
+
+  const sendOffs = await page.getByTestId('send-off').allTextContents()
+  expect(sendOffs.length).toBeGreaterThan(1)
+
+  // Different base paces mean different send-offs from the same line. If every
+  // swimmer got the same clock time, the resolver is not being run per swimmer.
+  expect(new Set(sendOffs).size).toBeGreaterThan(1)
+})
+
+test('advancing moves the whole practice, not one swimmer', async ({ page }) => {
+  await startSwimming(page, 3)
+
+  const first = await page.getByTestId('progress').textContent()
+  await page.getByTestId('next').click()
+  const second = await page.getByTestId('progress').textContent()
+
+  expect(second).not.toBe(first)
+  await expect(page.locator('[data-testid^="set-card-"]')).toHaveCount(3)
+})
+
+test('a set can be flagged for one swimmer without touching the others', async ({ page }) => {
+  await startSwimming(page, 3)
+
+  const flags = page.locator('[data-testid^="flag-too_hard-"]')
+  await flags.first().click()
+
+  await expect(flags.first()).toHaveAttribute('aria-pressed', 'true')
+  await expect(flags.nth(1)).toHaveAttribute('aria-pressed', 'false')
+
+  // Tapping again clears it: this is a note, not a commitment.
+  await flags.first().click()
+  await expect(flags.first()).toHaveAttribute('aria-pressed', 'false')
+})
+
+test('a practice rates every swimmer before it ends', async ({ page }) => {
+  await startSwimming(page, 2)
+
+  await advanceToFinish(page)
+  await page.getByTestId('finish').click()
+
+  // Two swimmers, two ratings, then home.
+  await expect(page.getByTestId('screen-post-swim')).toBeVisible()
+  await page.getByTestId('effort-about_right').click()
+  await expect(page.getByTestId('screen-post-swim')).toBeVisible()
+  await page.getByTestId('effort-about_right').click()
+
+  await expect(page.getByTestId('screen-home')).toBeVisible()
 })
