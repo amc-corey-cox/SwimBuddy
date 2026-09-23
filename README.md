@@ -118,15 +118,21 @@ one changes. Offline works. Installing works.
 
 Not built yet, in rough order of how much you will miss them:
 
-- **Settings**, so the three swimmers are still called Me, Wife and Son, the pool unit is
-  whatever it was seeded as, and a base pace cannot be changed from inside the app.
+- **The roster**, so swimmers cannot be added, renamed or marked adult or youth. The
+  three that exist are still called Me, Wife and Son.
+- **Coached practice**, where one device holds a whole practice — everybody on the same
+  arrangement resolved to their own numbers, with the coach moving it along and recording
+  how each of them is going.
+- **Settings**, so the pool unit is whatever it was seeded as and a base pace cannot be
+  changed from inside the app.
 - **History**, so a past session is recorded but cannot be looked at.
 - **The test set flow**, so base paces are provisional numbers rather than measured ones.
   The app knows they are provisional and can tell the difference.
-- **Swimming together**, meaning several workouts in progress at once on one phone,
-  handed round between swimmers.
 - **Per-set feedback**, for saying that one particular set was too hard rather than
   rating the whole session.
+
+A workout in progress also lives in memory rather than storage, so leaving the screen
+loses it. That is the first thing the practice work fixes.
 
 ## Development
 
