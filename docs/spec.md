@@ -382,13 +382,17 @@ import is checked before it is trusted, rather than after it has overwritten som
    nobody taps anything still ends with a workout recorded for everyone.
 4. **Post-swim** — three big rating buttons plus optional note, under 10 seconds, once
    per swimmer.
-5. **Roster** — add a swimmer, name them, choose adult or youth, set a base pace, remove
-   them. Reachable from screen 1 rather than buried in settings, because the roster
-   changes at the pool and not at a desk. The one screen without which a team cannot
-   exist, and the reason the swimmers are still called Me, Wife and Son.
-6. **History** — sessions per swimmer, total distance, weekly volume chart, and any sets
-   flagged during a practice.
-7. **Settings** — pool unit/length, test set entry, JSON export/import, link to source.
+
+Each swimmer's card shows the set _they_ are on, which need not be the one being called.
+Balancing gets everybody finishing at roughly the same time rather than exactly, and
+somebody always stops for goggles, so a card carries two taps that move that swimmer
+alone. Moving the practice moves everybody and keeps whatever drift they had: a swimmer a
+set behind is still a set behind, because silently catching them up would lose the fact
+that they are behind. 5. **Roster** — add a swimmer, name them, choose adult or youth, set a base pace, remove
+them. Reachable from screen 1 rather than buried in settings, because the roster
+changes at the pool and not at a desk. The one screen without which a team cannot
+exist, and the reason the swimmers are still called Me, Wife and Son. 6. **History** — sessions per swimmer, total distance, weekly volume chart, and any sets
+flagged during a practice. 7. **Settings** — pool unit/length, test set entry, JSON export/import, link to source.
 
 Screens 1 to 4 are built for a single swimmer. The multi-swimmer half of 1 and 3, the
 roster and History and Settings are not, so a swimmer cannot be named or added, the pool

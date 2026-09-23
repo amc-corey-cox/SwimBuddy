@@ -14,7 +14,10 @@ export interface Participant {
 }
 
 export interface WorkoutHandlers {
+  /** Moves the whole practice, and everybody in it, to a position. */
   onStep: (index: number) => void
+  /** Moves one swimmer without touching anybody else. */
+  onStepSwimmer: (swimmer: Swimmer, index: number) => void
   onFinish: () => void
   /** Records that this set was too hard or too easy for one swimmer. */
   onFlag: (swimmer: Swimmer, rating: EffortRating | undefined) => void
@@ -43,6 +46,8 @@ export function workoutScreen(
   participants: readonly Participant[],
   settings: Settings,
   index: number,
+  /** Where each swimmer actually is, which is not always where the practice is. */
+  swimmerPositions: ReadonlyMap<string, number>,
   flags: ReadonlyMap<string, EffortRating>,
   handlers: WorkoutHandlers,
 ): HTMLElement {
@@ -66,7 +71,15 @@ export function workoutScreen(
     ...(solo
       ? soloCard(participants, current, settings)
       : participants.map((participant) =>
-          swimmerCard(participant, current, settings, flags, handlers),
+          swimmerCard(
+            participant,
+            positions,
+            swimmerPositions.get(participant.swimmer.id) ?? index,
+            index,
+            settings,
+            flags,
+            handlers,
+          ),
         )),
     el('div', { class: 'row' }, [
       button(
@@ -145,24 +158,41 @@ function setCard(set: ResolvedSet, settings: Settings): HTMLElement {
  */
 function swimmerCard(
   participant: Participant,
-  position: Position,
+  positions: readonly Position[],
+  own: number,
+  practice: number,
   settings: Settings,
   flags: ReadonlyMap<string, EffortRating>,
   handlers: WorkoutHandlers,
 ): HTMLElement {
   const { swimmer } = participant
-  const set = setAt(participant.workout, position)
+  const position = positions[own]
+  const set = position === undefined ? undefined : setAt(participant.workout, position)
   const flag = flags.get(swimmer.id)
+  const behind = own - practice
+
+  const header = el('div', { class: 'swimmer-head' }, [
+    el('p', { class: 'swimmer-name', 'data-testid': `set-swimmer-${swimmer.id}` }, [swimmer.name]),
+    ...(behind === 0
+      ? []
+      : [
+          el('span', { class: 'drift', 'data-testid': `drift-${swimmer.id}` }, [
+            behind < 0 ? `${String(-behind)} behind` : `${String(behind)} ahead`,
+          ]),
+        ]),
+    nudge(swimmer, own - 1, '‹', own === 0, handlers),
+    nudge(swimmer, own + 1, '›', own >= positions.length, handlers),
+  ])
 
   if (set === undefined) {
     return el('article', { class: 'card card-done', 'data-testid': `set-card-${swimmer.id}` }, [
-      el('p', { class: 'swimmer-name' }, [swimmer.name]),
-      el('p', { class: 'muted' }, ['Done — this is past the end of their workout.']),
+      header,
+      el('p', { class: 'muted' }, ['Done — past the end of their workout.']),
     ])
   }
 
   return el('article', { class: 'card', 'data-testid': `set-card-${swimmer.id}` }, [
-    el('p', { class: 'swimmer-name', 'data-testid': `set-swimmer-${swimmer.id}` }, [swimmer.name]),
+    header,
     ...setLines(set, 'headline-small'),
     el('div', { class: 'chips' }, [
       flagChip(swimmer, 'too_easy', 'Too easy', flag, handlers),
@@ -170,6 +200,35 @@ function swimmerCard(
     ]),
     el('p', { class: 'muted unit' }, [settings.pool_unit]),
   ])
+}
+
+/**
+ * Moves one swimmer without moving the practice.
+ *
+ * Balancing gets everybody finishing a set at roughly the same time, not exactly,
+ * and somebody always stops for goggles. The set being called out is still one
+ * number — that is what the practice controls are for — but a swimmer who is a
+ * set behind should be looking at the set they are actually swimming.
+ */
+function nudge(
+  swimmer: Swimmer,
+  to: number,
+  label: string,
+  disabled: boolean,
+  handlers: WorkoutHandlers,
+): HTMLButtonElement {
+  return button(
+    label,
+    () => {
+      handlers.onStepSwimmer(swimmer, to)
+    },
+    {
+      class: 'nudge',
+      'data-testid': `nudge-${label === '‹' ? 'back' : 'on'}-${swimmer.id}`,
+      'aria-label': `${label === '‹' ? 'Move back' : 'Move on'}: ${swimmer.name}`,
+      ...(disabled ? { disabled: 'true' } : {}),
+    },
+  )
 }
 
 function flagChip(

@@ -356,3 +356,40 @@ h1 {
 .tile-on {
   outline: 3px solid var(--accent);
 }
+
+/* One swimmer's row header: who they are, whether they are off the set being
+   called, and the two taps that move them without moving anybody else. */
+
+.swimmer-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+
+.swimmer-head .swimmer-name {
+  margin: 0;
+  flex: 1;
+}
+
+.drift {
+  font-size: 0.8rem;
+  color: var(--danger);
+  white-space: nowrap;
+}
+
+.nudge {
+  min-width: 2.25rem;
+  padding: 0.3rem 0.5rem;
+  background: none;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 0.4rem;
+  color: var(--fg);
+  font: inherit;
+  cursor: pointer;
+}
+
+.nudge[disabled] {
+  opacity: 0.35;
+  cursor: default;
+}

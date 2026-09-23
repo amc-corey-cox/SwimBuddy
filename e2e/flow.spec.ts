@@ -355,3 +355,61 @@ test('a practice rates every swimmer before it ends', async ({ page }) => {
 
   await expect(page.getByTestId('screen-home')).toBeVisible()
 })
+
+/**
+ * Balancing gets everybody finishing a set at roughly the same time, not exactly,
+ * and somebody always stops for goggles. The set being called out is one number;
+ * where a swimmer actually is need not match it.
+ */
+test('one swimmer can be moved without moving the practice', async ({ page }) => {
+  await startSwimming(page, 3)
+
+  const practiceAt = async () => (await page.getByTestId('progress').textContent()) ?? ''
+  const before = await practiceAt()
+
+  const first = page.locator('[data-testid^="set-card-"]').first()
+  const swimmerId = (await first.getAttribute('data-testid'))?.replace('set-card-', '') ?? ''
+
+  await page.getByTestId(`nudge-on-${swimmerId}`).click()
+
+  // The practice has not moved, and that swimmer is now marked as ahead of it.
+  expect(await practiceAt()).toBe(before)
+  await expect(page.getByTestId(`drift-${swimmerId}`)).toHaveText('1 ahead')
+
+  // Nobody else drifted.
+  await expect(page.locator('[data-testid^="drift-"]')).toHaveCount(1)
+})
+
+test('a swimmer who is behind keeps their place when the practice moves on', async ({ page }) => {
+  await startSwimming(page, 2)
+
+  const first = page.locator('[data-testid^="set-card-"]').first()
+  const swimmerId = (await first.getAttribute('data-testid'))?.replace('set-card-', '') ?? ''
+
+  // Put the practice on set two, then drop one swimmer back to set one.
+  await page.getByTestId('next').click()
+  await page.getByTestId(`nudge-back-${swimmerId}`).click()
+  await expect(page.getByTestId(`drift-${swimmerId}`)).toHaveText('1 behind')
+
+  // Moving the practice on carries the drift rather than silently correcting it.
+  await page.getByTestId('next').click()
+  await expect(page.getByTestId(`drift-${swimmerId}`)).toHaveText('1 behind')
+})
+
+test('a swimmer shows their own set, not the one being called', async ({ page }) => {
+  await startSwimming(page, 2)
+
+  const cards = page.locator('[data-testid^="set-card-"]')
+  const swimmerId =
+    (await cards.first().getAttribute('data-testid'))?.replace('set-card-', '') ?? ''
+
+  const headlines = async () => cards.locator('[data-testid="headline"]').allTextContents()
+  const together = await headlines()
+
+  await page.getByTestId(`nudge-on-${swimmerId}`).click()
+  const apart = await headlines()
+
+  // The nudged swimmer's card changed; the other one did not.
+  expect(apart[0]).not.toBe(together[0])
+  expect(apart[1]).toBe(together[1])
+})

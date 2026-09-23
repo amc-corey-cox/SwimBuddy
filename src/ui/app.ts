@@ -28,6 +28,14 @@ import type { SwimBuddyStore } from '../storage/store'
 interface Practice {
   readonly template: Template
   readonly members: readonly Participant[]
+  /**
+   * Where each swimmer actually is.
+   *
+   * Balancing gets everybody finishing a set at roughly the same time rather than
+   * exactly, and somebody always stops to fix their goggles. The practice has one
+   * position — the set being called out — and a swimmer may be a set off it.
+   */
+  readonly positions: Map<Uuid, number>
   /** Set feedback, keyed by swimmer then by the set's position in their workout. */
   readonly flags: Map<Uuid, Map<string, EffortRating>>
 }
@@ -249,6 +257,7 @@ export async function startApp(options: AppOptions): Promise<void> {
                     }
                   }),
                 ).map(({ swimmer, workout }) => ({ swimmer, workout })),
+                positions: new Map(chosen.map((swimmer) => [swimmer.id, 0])),
                 flags: new Map(),
               },
               index: 0,
@@ -263,24 +272,41 @@ export async function startApp(options: AppOptions): Promise<void> {
       const { practice, index } = current
       wakeLock ??= keepScreenAwake()
 
+      // A flag belongs to the set that swimmer is actually on, not to the one
+      // being called out, because those are not always the same set.
+      const positionOf = (swimmerId: Uuid): number => practice.positions.get(swimmerId) ?? index
+
       const flagsHere = new Map<Uuid, EffortRating>()
       for (const [swimmerId, byPosition] of practice.flags) {
-        const rating = byPosition.get(String(index))
+        const rating = byPosition.get(String(positionOf(swimmerId)))
         if (rating !== undefined) flagsHere.set(swimmerId, rating)
       }
 
       mount.append(
-        workoutScreen(practice.members, settings, index, flagsHere, {
+        workoutScreen(practice.members, settings, index, practice.positions, flagsHere, {
           onStep: (next) => {
+            // The practice moves and everybody moves with it, keeping whatever
+            // drift they had: a swimmer a set behind is still a set behind.
+            for (const member of practice.members) {
+              practice.positions.set(
+                member.swimmer.id,
+                positionOf(member.swimmer.id) + next - index,
+              )
+            }
             go({ name: 'workout', practice, index: next })
+          },
+          onStepSwimmer: (swimmer, to) => {
+            practice.positions.set(swimmer.id, to)
+            void render()
           },
           onFinish: () => {
             go({ name: 'post-swim', practice, rated: 0 })
           },
           onFlag: (swimmer, rating) => {
             const byPosition = practice.flags.get(swimmer.id) ?? new Map<string, EffortRating>()
-            if (rating === undefined) byPosition.delete(String(index))
-            else byPosition.set(String(index), rating)
+            const at = String(positionOf(swimmer.id))
+            if (rating === undefined) byPosition.delete(at)
+            else byPosition.set(at, rating)
             practice.flags.set(swimmer.id, byPosition)
             void render()
           },
