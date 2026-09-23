@@ -281,6 +281,11 @@ import is checked before it is trusted, rather than after it has overwritten som
 5. **History** — sessions per swimmer, total distance, weekly volume chart.
 6. **Settings** — pool unit/length, test set entry, JSON export/import, link to source.
 
+Screens 1 to 4 are built. History and Settings are not, so the pool unit and length are
+whatever seeding set and a base pace can only be changed by editing storage. A workout in
+progress is held in memory: leaving the workout screen loses it, which is why the wake
+lock matters and why a session is only written once it has been rated.
+
 ## Future backend (not v1 — do not build it yet)
 
 A small sync server may follow: shared template library, syncing the three phones, maybe

@@ -19,5 +19,5 @@
 
     "types": ["node"]
   },
-  "include": ["vite.config.ts", "playwright.config.ts"]
+  "include": ["vite.config.ts", "playwright.config.ts", "scripts/service-worker-plugin.ts"]
 }
