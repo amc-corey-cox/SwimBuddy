@@ -1,4 +1,4 @@
-import { openDB, type IDBPDatabase } from 'idb'
+import { deleteDB, openDB, type IDBPDatabase } from 'idb'
 import {
   DATABASE_NAME,
   DATABASE_VERSION,
@@ -53,4 +53,22 @@ export async function openDatabase(
     blocked: onUpgradeBlocked,
     blocking: onUpgradeBlocking,
   })
+}
+
+/** A delete is waiting on a connection another tab still holds open. */
+export function onDeleteBlocked(): void {
+  console.warn('Swim Buddy: erasing the database is blocked by another open tab.')
+}
+
+/**
+ * Deletes the database outright, so the next open starts from nothing.
+ *
+ * There is no export yet, so this is irreversible and the only undo is that
+ * seeding puts the household back. The caller must close its store first:
+ * IndexedDB will not delete a database that still has an open connection, and
+ * a blocked delete does not fail, it simply never completes — which on a phone
+ * is indistinguishable from the app having hung.
+ */
+export async function deleteDatabase(name: string = DATABASE_NAME): Promise<void> {
+  await deleteDB(name, { blocked: onDeleteBlocked })
 }
